@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   IconCheck,
   IconFilm,
@@ -12,7 +12,7 @@ import {
 import { Badge, Btn, Card, CardHead, Toggle, cn } from "@/components/ui";
 import { api, bump, toast, useFetch } from "@/lib/api";
 import { faCompact, faDate, faNum } from "@/lib/format";
-import type { Account } from "@/lib/types";
+import type { Account, BotSettings } from "@/lib/types";
 
 export default function AccountsPage() {
   const { data: accounts } = useFetch<Account[]>("/api/accounts");
@@ -132,6 +132,8 @@ export default function AccountsPage() {
         </div>
       </Card>
 
+      <TikTokQrCard />
+
       {/* TikTok connection guide */}
       <Card className="animate-pop overflow-hidden">
         <CardHead
@@ -189,19 +191,32 @@ export default function AccountsPage() {
         {(accounts ?? []).map((a) => (
           <Card key={a.id} className="animate-pop overflow-hidden">
             <div className="flex items-center gap-3 border-b border-line bg-cream/60 px-5 py-4">
-              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-ink-900 font-display text-xl text-cream">
-                {a.displayName.slice(0, 1)}
-              </span>
+              {a.avatar ? (
+                <img
+                  src={a.avatar}
+                  alt=""
+                  className="h-11 w-11 shrink-0 rounded-xl object-cover ring-2 ring-teal-100"
+                />
+              ) : (
+                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-ink-900 font-display text-xl text-cream">
+                  {a.displayName.slice(0, 1)}
+                </span>
+              )}
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-bold">{a.displayName}</p>
                 <p dir="ltr" className="truncate text-right text-[11px] text-ink-500">
                   @{a.username}
                 </p>
               </div>
-              {a.status === "active" ? (
-                <Badge tone="leaf">
-                  <IconCheck className="h-3 w-3" /> فعال
+              {a.loginMethod === "qr_oauth" ? (
+                <Badge tone="teal">
+                  <IconCheck className="h-3 w-3" /> اتصال رسمی
                 </Badge>
+              ) : (
+                <Badge tone="ink">اتصال دستی</Badge>
+              )}
+              {a.status === "active" ? (
+                <Badge tone="leaf">فعال</Badge>
               ) : (
                 <Badge tone="sun">متوقف موقت</Badge>
               )}
@@ -242,5 +257,181 @@ export default function AccountsPage() {
         ))}
       </div>
     </div>
+  );
+}
+
+// ═══════════════ Official TikTok QR login ═══════════════
+
+type QrState = "idle" | "qr" | "expired";
+
+function TikTokQrCard() {
+  const { data: settings } = useFetch<BotSettings>("/api/settings");
+  const [creds, setCreds] = useState({ key: "", secret: "" });
+  const [state, setState] = useState<QrState>("idle");
+  const [qrImg, setQrImg] = useState("");
+  const [qrToken, setQrToken] = useState("");
+  const [qrTicket, setQrTicket] = useState("");
+  const [scanStatus, setScanStatus] = useState("new");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  // hydrate credential inputs once settings arrive
+  useEffect(() => {
+    if (settings) {
+      setCreds((c) => ({
+        key: c.key || settings.tiktokClientKey,
+        secret: c.secret || settings.tiktokClientSecret,
+      }));
+    }
+  }, [settings]);
+
+  // poll the QR status
+  useEffect(() => {
+    if (state !== "qr" || !qrToken) return;
+    const t = setInterval(async () => {
+      try {
+        const r = await api<{
+          ok: boolean;
+          status: string;
+          error?: string;
+          account?: { username: string };
+        }>("/api/tiktok/qr", {
+          method: "POST",
+          body: JSON.stringify({ action: "check", token: qrToken, ticket: qrTicket }),
+        });
+        if (r.error) {
+          setError(r.error);
+          setState("expired");
+          return;
+        }
+        setScanStatus(r.status);
+        if (r.status === "confirmed") {
+          setState("idle");
+          toast(`🎉 حساب @${r.account?.username ?? ""} با لاگین رسمی متصل شد`);
+          bump();
+        } else if (r.status === "expired" || r.status === "utilised") {
+          setState("expired");
+        }
+      } catch {
+        /* transient network errors are retried on the next tick */
+      }
+    }, 2500);
+    return () => clearInterval(t);
+  }, [state, qrToken, qrTicket]);
+
+  async function saveCredsAndStart() {
+    setBusy(true);
+    setError("");
+    try {
+      if (creds.key.trim() || creds.secret.trim()) {
+        await api("/api/settings", {
+          method: "PATCH",
+          body: JSON.stringify({
+            tiktokClientKey: creds.key.trim(),
+            tiktokClientSecret: creds.secret.trim(),
+          }),
+        });
+        bump();
+      }
+      const r = await api<{ ok: true; qrDataUrl: string; token: string; ticket: string }>(
+        "/api/tiktok/qr",
+        { method: "POST", body: JSON.stringify({ action: "start" }) }
+      );
+      setQrImg(r.qrDataUrl);
+      setQrToken(r.token);
+      setQrTicket(r.ticket);
+      setScanStatus("new");
+      setState("qr");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "خطا در دریافت کد کیوآر");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const statusText: Record<string, string> = {
+    new: "در انتظار اسکن با اپ تیک‌تاک…",
+    scanned: "اسکن شد ✅ حالا تأیید را در اپ بزنید",
+    confirmed: "متصل شد!",
+  };
+
+  return (
+    <Card className="animate-pop overflow-hidden">
+      <CardHead
+        icon={<IconTiktok className="h-5 w-5" />}
+        title="اتصال رسمی با لاگین کیوآر تیک‌تاک"
+        sub="اسکن با اپ رسمی — بدون یوزرنیم/رمز، با مجوز رسمی توسعه‌دهنده"
+        extra={<Badge tone="teal">OAuth رسمی</Badge>}
+      />
+      <div className="grid gap-5 p-5 lg:grid-cols-2">
+        <div className="space-y-4">
+          <p className="text-xs leading-6 text-ink-700">
+            برای لاگین کیوآر به یک اپ در <b dir="ltr">developers.tiktok.com</b> نیاز دارید
+            (رایگان). ساخت اپ ۵ دقیقه است؛ دسترسی‌های <code dir="ltr" className="rounded bg-coral-50 px-1 text-[10px]">user.info.basic</code> و{" "}
+            <code dir="ltr" className="rounded bg-coral-50 px-1 text-[10px]">video.publish</code> را
+            برای آن فعال کنید.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <p className="mb-1.5 text-xs font-bold text-ink-700">Client Key</p>
+              <input
+                dir="ltr"
+                value={creds.key}
+                onChange={(e) => setCreds((c) => ({ ...c, key: e.target.value }))}
+                placeholder="aw7nk86b7czitwc9"
+                className="w-full rounded-xl border border-line bg-cream px-4 py-2.5 font-mono text-xs outline-none focus:border-teal-500 focus:bg-paper"
+              />
+            </div>
+            <div>
+              <p className="mb-1.5 text-xs font-bold text-ink-700">Client Secret</p>
+              <input
+                dir="ltr"
+                value={creds.secret}
+                onChange={(e) => setCreds((c) => ({ ...c, secret: e.target.value }))}
+                placeholder="••••••••"
+                className="w-full rounded-xl border border-line bg-cream px-4 py-2.5 font-mono text-xs outline-none focus:border-teal-500 focus:bg-paper"
+              />
+            </div>
+          </div>
+          {error && (
+            <p className="rounded-lg bg-[#fde3e1] px-3 py-2 text-xs font-bold text-ruby-500">
+              {error}
+            </p>
+          )}
+          <Btn variant="teal" onClick={saveCredsAndStart} disabled={busy} className="w-full">
+            {busy
+              ? "در حال دریافت کد…"
+              : state === "expired"
+                ? "دریافت کد کیوآر جدید"
+                : "🔐 دریافت کد کیوآر ورود"}
+          </Btn>
+          {state === "qr" && (
+            <p className="rounded-lg border border-teal-100 bg-teal-50 px-3 py-2 text-center text-xs font-bold text-teal-700">
+              {statusText[scanStatus] ?? scanStatus}
+            </p>
+          )}
+        </div>
+
+        <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-line bg-cream/60 p-5">
+          {state === "qr" && qrImg ? (
+            <>
+              <img src={qrImg} alt="کد کیوآر ورود تیک‌تاک" className="w-56 rounded-xl ring-1 ring-line" />
+              <p className="text-center text-[11px] leading-5 text-ink-500">
+                اپ تیک‌تاک را باز کنید ← بخش پروفایل ← آیکون کیوآر بالا ← اسکن این کد ← تأیید
+              </p>
+            </>
+          ) : (
+            <>
+              <span className="animate-floaty text-5xl">📱</span>
+              <p className="text-center text-xs leading-6 text-ink-500">
+                کد کیوآر اینجا نمایش داده می‌شود.
+                <br />
+                با اپ تیک‌تاک اسکنش کنید تا حساب به ربات وصل شود.
+              </p>
+            </>
+          )}
+        </div>
+      </div>
+    </Card>
   );
 }

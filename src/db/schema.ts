@@ -42,6 +42,11 @@ export const accounts = pgTable("accounts", {
   followers: integer("followers").notNull().default(0),
   videosCount: integer("videos_count").notNull().default(0),
   status: text("status").notNull().default("active"),
+  loginMethod: text("login_method").notNull().default("manual"),
+  accessToken: text("access_token").notNull().default(""),
+  refreshToken: text("refresh_token").notNull().default(""),
+  tokenExpiresAt: timestamp("token_expires_at"),
+  avatar: text("avatar").notNull().default(""),
   connectedAt: timestamp("connected_at").notNull().defaultNow(),
 });
 
@@ -67,4 +72,6 @@ export const settings = pgTable("settings", {
   chatId: text("chat_id").notNull().default(""),
   adminPasswordHash: text("admin_password_hash").notNull().default(""),
   onboardingDone: boolean("onboarding_done").notNull().default(false),
+  tiktokClientKey: text("tiktok_client_key").notNull().default(""),
+  tiktokClientSecret: text("tiktok_client_secret").notNull().default(""),
 });

@@ -21,7 +21,11 @@ function v(v: VideoRow): Video {
 }
 
 function a(x: AccountRow): Account {
-  return { ...x, connectedAt: x.connectedAt.toISOString() };
+  return {
+    ...x,
+    tokenExpiresAt: x.tokenExpiresAt?.toISOString() ?? null,
+    connectedAt: x.connectedAt.toISOString(),
+  };
 }
 
 export async function GET() {

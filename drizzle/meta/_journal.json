@@ -15,6 +15,13 @@
       "when": 1788893320737,
       "tag": "0001_panoramic_rachel_grey",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788895276012,
+      "tag": "0002_real_dark_beast",
+      "breakpoints": true
     }
   ]
 }

@@ -32,6 +32,10 @@ export interface Account {
   followers: number;
   videosCount: number;
   status: string;
+  loginMethod: string;
+  accessToken: string;
+  tokenExpiresAt: string | null;
+  avatar: string;
   connectedAt: string;
 }
 
@@ -57,6 +61,8 @@ export interface BotSettings {
   chatId: string;
   adminPasswordHash: string;
   onboardingDone: boolean;
+  tiktokClientKey: string;
+  tiktokClientSecret: string;
 }
 
 export interface Stats {
