@@ -139,10 +139,13 @@ export async function validateSession(
   username: string,
   sessionCookie: string
 ): Promise<TikTokProfile | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
   try {
     const res = await fetch(
       `https://www.tiktok.com/api/user/detail/?uniqueId=${encodeURIComponent(username)}`,
       {
+        signal: controller.signal,
         headers: {
           cookie: `sessionid=${sessionCookie}`,
           "user-agent":
@@ -162,6 +165,8 @@ export async function validateSession(
     };
   } catch {
     return null;
+  } finally {
+    clearTimeout(timer);
   }
 }
 

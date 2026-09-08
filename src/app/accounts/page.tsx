@@ -216,6 +216,8 @@ export default function AccountsPage() {
                 <Badge tone="teal">
                   <IconCheck className="h-3 w-3" /> اتصال رسمی
                 </Badge>
+              ) : a.loginMethod === "session" ? (
+                <Badge tone="sun">اتصال با نشست</Badge>
               ) : (
                 <Badge tone="ink">اتصال دستی</Badge>
               )}
@@ -450,9 +452,13 @@ function SessionCard() {
   const [error, setError] = useState("");
 
   async function connect() {
-    setBusy(true);
     setError("");
     setResult(null);
+    if (!username.trim() || !session.trim()) {
+      setError("هر دو فیلد (نام کاربری و Session ID) را پر کنید تا دکمه ذخیره فعال شود");
+      return;
+    }
+    setBusy(true);
     try {
       const r = await api<{ ok: true; validated: boolean; account: { username: string } }>(
         "/api/tiktok/session",
@@ -511,8 +517,8 @@ function SessionCard() {
                 : `حساب @${result.username} ذخیره شد؛ اعتبارسنجی از این سرور ممکن نشد ولی نشست برای انتشار نگه داشته شد`}
             </p>
           )}
-          <Btn variant="dark" onClick={connect} disabled={busy || !username || !session} className="w-full">
-            {busy ? "در حال بررسی نشست…" : "🔗 اتصال با این نشست"}
+          <Btn variant="dark" onClick={connect} disabled={busy} className="w-full py-3">
+            {busy ? "در حال ذخیره و بررسی نشست…" : "💾 ذخیره و اتصال نشست"}
           </Btn>
         </div>
         <div className="rounded-xl border border-sun-300/40 bg-sun-100/40 p-4">
