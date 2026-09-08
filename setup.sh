@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ════════════════════════════════════════════════════════════════
-#   🤖 اسکریپت راه‌انداز «نقلی‌استودیو» — نسخه ۲.۴.۱
+#   🤖 اسکریپت راه‌انداز «نقلی‌استودیو» — نسخه ۲.۴.۲
 #   ربات خودکار تولید و انتشار ویدئوی کودک در تیک‌تاک
 #
 #   سیستم‌عامل: Ubuntu 20.04+ / Debian 11+
@@ -78,7 +78,7 @@ run_psql() { sudo -u postgres psql "$@"; }
 
 echo ""
 echo "════════════════════════════════════════════"
-echo "   🤖 راه‌انداز نقلی‌استودیو — نسخه ۲.۴.۱"
+echo "   🤖 راه‌انداز نقلی‌استودیو — نسخه ۲.۴.۲"
 echo "════════════════════════════════════════════"
 echo ""
 
@@ -90,6 +90,8 @@ if [[ "$ACTION" == "update" ]]; then
   if [[ -d .git ]]; then
     log "دریافت آخرین تغییرات از گیت…"
     git pull --ff-only || warn "git pull ناموفق بود؛ از کد فعلی استفاده می‌شود."
+  else
+    warn "این نصب مخزن گیت ندارد؛ برای به‌روزرسانی، نسخه جدید پروژه را دوباره روی سرور کپی و اسکریپت را اجرا کنید."
   fi
   log "نصب وابستگی‌ها…"
   npm ci --no-audit --no-fund || npm install --no-audit --no-fund
@@ -111,6 +113,17 @@ apt-get update -y >/dev/null || warn "apt-get update با خطا مواجه شد
 apt-get install -y curl ca-certificates gnupg git rsync openssl >/dev/null \
   || err "نصب پکیج‌های پایه ناموفق بود؛ اتصال اینترنت سرور را بررسی کنید."
 ok "پکیج‌های پایه نصب شدند"
+
+# ════════════════ ۱.۵) بررسی وجود کد پروژه ════════════════
+# اگر اسکریپت تنها دانلود شده باشد، مخزن را خودکار از گیت‌هاب می‌گیرد
+if [[ ! -f "${SRC_DIR}/package.json" ]]; then
+  log "فایل‌های پروژه کنار اسکریپت پیدا نشد؛ کلون خودکار از گیت‌هاب…"
+  rm -rf "${SRC_DIR}/.naqoli-src"
+  git clone --depth 1 https://github.com/darkfalkon369-crypto/naqoli-studio.git "${SRC_DIR}/.naqoli-src" \
+    || err "کلون خودکار از گیت‌هاب ناموفق بود؛ پروژه را دستی کنار اسکریپت قرار دهید."
+  SRC_DIR="${SRC_DIR}/.naqoli-src"
+  ok "کد پروژه از گیت‌هاب دریافت شد"
+fi
 
 # ════════════════ ۲) Node.js ════════════════
 NEED_NODE=1
@@ -154,8 +167,9 @@ SRC_REAL="$(realpath "$SRC_DIR")"
 APP_REAL="$(realpath -m "$APP_DIR")"
 if [[ "$SRC_REAL" != "$APP_REAL" ]]; then
   log "کپی پروژه از ${SRC_DIR} به ${APP_DIR}…"
+  # توجه: .git عمداً نگه داشته می‌شود تا «--update» بتواند بعداً پول کند
   rsync -a --delete \
-    --exclude node_modules --exclude .next --exclude .git \
+    --exclude node_modules --exclude .next \
     "${SRC_DIR}/" "${APP_DIR}/"
 fi
 cd "$APP_DIR"
@@ -224,13 +238,21 @@ EOF
 
 systemctl daemon-reload
 systemctl enable --now "${SERVICE_NAME}"
-sleep 3
 if systemctl is-active --quiet "${SERVICE_NAME}"; then
   ok "سرویس ${SERVICE_NAME} فعال و در حال اجراست"
-  if curl -fsS "http://127.0.0.1:${APP_PORT}/api/health" >/dev/null 2>&1; then
+  HEALTH_OK=0
+  log "در حال هلث‌چک اپلیکیشن (تا ۲۰ ثانیه)…"
+  for i in $(seq 1 10); do
+    if curl -fsS "http://127.0.0.1:${APP_PORT}/api/health" >/dev/null 2>&1; then
+      HEALTH_OK=1
+      break
+    fi
+    sleep 2
+  done
+  if [[ "$HEALTH_OK" == "1" ]]; then
     ok "هلث‌چک اپلیکیشن پاسخ داد — همه‌چیز سالم است 🎯"
   else
-    warn "اپ هنوز بالا نیامده؛ چند لحظه صبر کنید و دوباره /api/health را چک کنید."
+    warn "اپ هنوز پاسخ نمی‌دهد؛ لاگ را ببینید: journalctl -u ${SERVICE_NAME} -n 50"
   fi
 else
   warn "سرویس فعال نشد — لاگ‌ها را ببینید: journalctl -u ${SERVICE_NAME} -n 50"
@@ -240,23 +262,30 @@ fi
 WEBHOOK_HINT="http://YOUR_SERVER_IP:${APP_PORT}/api/webhook (برای تلگرام به دامنه و HTTPS نیاز دارید)"
 if [[ -n "$DOMAIN" ]]; then
   log "نصب Caddy برای دامنه ${DOMAIN} و صدور گواهی SSL خودکار…"
-  apt-get install -y debian-keyring debian-archive-keyring apt-transport-https >/dev/null 2>&1 || true
-  curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' \
-    | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg 2>/dev/null || true
-  curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' > /etc/apt/sources.list.d/caddy-stable.list
-  apt-get update -y >/dev/null
-  apt-get install -y caddy >/dev/null || err "نصب Caddy ناموفق بود."
-
-  cat > /etc/caddy/Caddyfile <<EOF
+  CADDY_OK=0
+  if apt-get install -y debian-keyring debian-archive-keyring apt-transport-https >/dev/null 2>&1 \
+     && curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' \
+          | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg 2>/dev/null \
+     && curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' > /etc/apt/sources.list.d/caddy-stable.list \
+     && apt-get update -y >/dev/null 2>&1 \
+     && apt-get install -y caddy >/dev/null 2>&1; then
+    CADDY_OK=1
+  fi
+  if [[ "$CADDY_OK" == "1" ]]; then
+    cat > /etc/caddy/Caddyfile <<EOF
 ${DOMAIN} {
     encode gzip zstd
     reverse_proxy 127.0.0.1:${APP_PORT}
 }
 EOF
-  systemctl enable --now caddy
-  systemctl restart caddy
-  ok "Caddy فعال شد — ظرف چند لحظه گواهی SSL برای ${DOMAIN} صادر می‌شود"
-  WEBHOOK_HINT="https://${DOMAIN}/api/webhook"
+    systemctl enable --now caddy >/dev/null 2>&1 || true
+    systemctl restart caddy >/dev/null 2>&1 || true
+    ok "Caddy فعال شد — ظرف چند لحظه گواهی SSL برای ${DOMAIN} صادر می‌شود"
+    WEBHOOK_HINT="https://${DOMAIN}/api/webhook"
+  else
+    warn "نصب Caddy ناموفق بود؛ نصب کامل شد ولی بدون SSL."
+    warn "اپ روی پورت ${APP_PORT} در دسترس است. برای فعال‌سازی دامنه، دستورهای صفحه آموزش را ببینید."
+  fi
 fi
 
 # ════════════════ ۹) فایروال ════════════════
