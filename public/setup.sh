@@ -1,40 +1,40 @@
 #!/usr/bin/env bash
 # ════════════════════════════════════════════════════════════════
-#   🤖 اسکریپت راه‌انداز «نقلی‌استودیو» — نسخه ۲.۴.۲
-#   ربات خودکار تولید و انتشار ویدئوی کودک در تیک‌تاک
+#   🤖 Naqoli Studio — Setup Script (v2.5.0)
+#   Fully automated kids-video bot for TikTok + Telegram management
 #
-#   سیستم‌عامل: Ubuntu 20.04+ / Debian 11+
+#   Supported OS: Ubuntu 20.04+ / Debian 11+
 #
-#   نصب کامل:
+#   Full install:
 #     sudo bash setup.sh
-#     sudo bash setup.sh --domain example.com   ← با دامنه و SSL خودکار
-#   سایر:
-#     sudo bash setup.sh --port 8080            ← پورت دلخواه
-#     sudo bash setup.sh --update               ← به‌روزرسانی و بیلد مجدد
-#     sudo bash setup.sh --status               ← وضعیت سرویس
+#     sudo bash setup.sh --domain example.com   ← with domain + auto SSL
+#   Other options:
+#     sudo bash setup.sh --port 8080            ← custom port
+#     sudo bash setup.sh --update               ← pull, rebuild, restart
+#     sudo bash setup.sh --status               ← service status
 # ════════════════════════════════════════════════════════════════
 set -euo pipefail
 
-# ──────────── تنظیمات پیش‌فرض (با فلگ قابل تغییرند) ────────────
+# ──────────── Defaults (overridable via flags) ────────────
 APP_NAME="naqoli-studio"
 APP_DIR="/var/www/${APP_NAME}"
 DB_NAME="app_db"
 DB_USER="postgres"
-DB_PASS=""                      # خالی = تصادفی امن ساخته می‌شود
+DB_PASS=""                      # empty = a secure random password is generated
 APP_PORT=3000
-DOMAIN=""                       # خالی = بدون دامنه/SSL
+DOMAIN=""                       # empty = no domain/SSL
 NODE_MAJOR=22
 SERVICE_NAME="naqoli"
 ACTION="install"
 
-# ──────────── خروجی رنگی ────────────
+# ──────────── Colored output ────────────
 C_OK="\033[1;32m"; C_INFO="\033[1;36m"; C_WARN="\033[1;33m"; C_ERR="\033[1;31m"; C_OFF="\033[0m"
-log()  { echo -e "${C_INFO}🤖 [نقلی]${C_OFF} $1"; }
+log()  { echo -e "${C_INFO}🤖 [setup]${C_OFF} $1"; }
 ok()   { echo -e "${C_OK}✅${C_OFF} $1"; }
 warn() { echo -e "${C_WARN}⚠️${C_OFF} $1"; }
 err()  { echo -e "${C_ERR}❌ $1${C_OFF}" >&2; exit 1; }
 
-# ──────────── خواندن فلگ‌ها ────────────
+# ──────────── Parse flags ────────────
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --domain)  DOMAIN="$2"; shift 2 ;;
@@ -44,32 +44,32 @@ while [[ $# -gt 0 ]]; do
     --update)  ACTION="update"; shift ;;
     --status)  ACTION="status"; shift ;;
     -h|--help) ACTION="help"; shift ;;
-    *) err "فلگ ناشناخته: $1 (از --help استفاده کنید)" ;;
+    *) err "Unknown flag: $1 (use --help for usage)" ;;
   esac
 done
 
 if [[ "$ACTION" == "help" ]]; then
-  echo "استفاده: sudo bash setup.sh [گزینه‌ها]"
+  echo "Usage: sudo bash setup.sh [options]"
   echo ""
-  echo "  --domain DOMAIN    دامنه شما (نصب خودکار Caddy + SSL رایگان)"
-  echo "  --port PORT        پورت اپلیکیشن (پیش‌فرض: 3000)"
-  echo "  --app-dir DIR      محل نصب (پیش‌فرض: /var/www/naqoli-studio)"
-  echo "  --db-pass PASS     رمز دیتابیس (پیش‌فرض: تصادفی امن)"
-  echo "  --update           به‌روزرسانی کد، بیلد مجدد و ری‌استارت"
-  echo "  --status           وضعیت سرویس و لاگ‌های اخیر"
+  echo "  --domain DOMAIN    Your domain (auto-installs Caddy + free SSL)"
+  echo "  --port PORT        Application port (default: 3000)"
+  echo "  --app-dir DIR      Install directory (default: /var/www/naqoli-studio)"
+  echo "  --db-pass PASS     Database password (default: secure random)"
+  echo "  --update           Pull latest code, rebuild and restart"
+  echo "  --status           Service status and recent logs"
   exit 0
 fi
 
-# ──────────── حالت وضعیت ────────────
+# ──────────── Status mode ────────────
 if [[ "$ACTION" == "status" ]]; then
   systemctl status "${SERVICE_NAME}" --no-pager || true
   echo ""
-  echo "─── ۱۰ خط آخر لاگ ───"
+  echo "─── last 10 log lines ───"
   journalctl -u "${SERVICE_NAME}" -n 10 --no-pager || true
   exit 0
 fi
 
-[[ "$(id -u)" == "0" ]] || err "اسکریپت باید با دسترسی روت اجرا شود:  sudo bash setup.sh"
+[[ "$(id -u)" == "0" ]] || err "This script must run as root:  sudo bash setup.sh"
 
 SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export DEBIAN_FRONTEND=noninteractive
@@ -78,140 +78,140 @@ run_psql() { sudo -u postgres psql "$@"; }
 
 echo ""
 echo "════════════════════════════════════════════"
-echo "   🤖 راه‌انداز نقلی‌استودیو — نسخه ۲.۴.۲"
+echo "   🤖 Naqoli Studio Installer — v2.5.0"
 echo "════════════════════════════════════════════"
 echo ""
 
-# ════════════════ حالت به‌روزرسانی ════════════════
+# ════════════════ Update mode ════════════════
 if [[ "$ACTION" == "update" ]]; then
-  [[ -d "$APP_DIR" ]] || err "پروژه در ${APP_DIR} پیدا نشد؛ اول نصب کامل را اجرا کنید."
+  [[ -d "$APP_DIR" ]] || err "Project not found at ${APP_DIR}; run the full install first."
   cd "$APP_DIR"
   git config --global --add safe.directory "$APP_DIR" 2>/dev/null || true
   if [[ -d .git ]]; then
-    log "دریافت آخرین تغییرات از گیت…"
-    git pull --ff-only || warn "git pull ناموفق بود؛ از کد فعلی استفاده می‌شود."
+    log "Pulling latest changes from git…"
+    git pull --ff-only || warn "git pull failed; continuing with the current code."
   else
-    warn "این نصب مخزن گیت ندارد؛ برای به‌روزرسانی، نسخه جدید پروژه را دوباره روی سرور کپی و اسکریپت را اجرا کنید."
+    warn "This installation has no git repository; to update, copy the new release onto the server and run this script again."
   fi
-  log "نصب وابستگی‌ها…"
+  log "Installing dependencies…"
   npm ci --no-audit --no-fund || npm install --no-audit --no-fund
-  log "اعمال تغییرات احتمالی اسکیما…"
+  log "Applying possible schema changes…"
   set -a; [[ -f .env ]] && . ./.env; set +a
-  npx drizzle-kit push --force || warn "drizzle-kit push انجام نشد (اگر اسکیما تغییری نکرده مهم نیست)"
-  log "بیلد پروداکشن…"
+  npx drizzle-kit push --force || warn "drizzle-kit push skipped (fine if the schema did not change)"
+  log "Building for production…"
   npm run build
   chown -R www-data:www-data "$APP_DIR"
-  log "ری‌استارت سرویس…"
+  log "Restarting service…"
   systemctl restart "${SERVICE_NAME}"
-  ok "به‌روزرسانی کامل شد! وضعیت: systemctl status ${SERVICE_NAME}"
+  ok "Update complete! Check: systemctl status ${SERVICE_NAME}"
   exit 0
 fi
 
-# ════════════════ ۱) پیش‌نیازها ════════════════
-log "نصب پکیج‌های پایه (apt)…"
-apt-get update -y >/dev/null || warn "apt-get update با خطا مواجه شد؛ ادامه می‌دهیم…"
+# ════════════════ 1) Base packages ════════════════
+log "Installing base packages (apt)…"
+apt-get update -y >/dev/null || warn "apt-get update reported errors; continuing…"
 apt-get install -y curl ca-certificates gnupg git rsync openssl >/dev/null \
-  || err "نصب پکیج‌های پایه ناموفق بود؛ اتصال اینترنت سرور را بررسی کنید."
-ok "پکیج‌های پایه نصب شدند"
+  || err "Failed to install base packages; check the server's internet connection."
+ok "Base packages installed"
 
-# ════════════════ ۱.۵) بررسی وجود کد پروژه ════════════════
-# اگر اسکریپت تنها دانلود شده باشد، مخزن را خودکار از گیت‌هاب می‌گیرد
+# ════════════════ 1.5) Ensure project files exist ════════════════
+# If the script was downloaded alone, clone the repository automatically
 if [[ ! -f "${SRC_DIR}/package.json" ]]; then
-  log "فایل‌های پروژه کنار اسکریپت پیدا نشد؛ کلون خودکار از گیت‌هاب…"
+  log "Project files not found next to the script; cloning from GitHub…"
   rm -rf "${SRC_DIR}/.naqoli-src"
   git clone --depth 1 https://github.com/darkfalkon369-crypto/naqoli-studio.git "${SRC_DIR}/.naqoli-src" \
-    || err "کلون خودکار از گیت‌هاب ناموفق بود؛ پروژه را دستی کنار اسکریپت قرار دهید."
+    || err "Auto-clone from GitHub failed; place the project files next to this script."
   SRC_DIR="${SRC_DIR}/.naqoli-src"
-  ok "کد پروژه از گیت‌هاب دریافت شد"
+  ok "Project source fetched from GitHub"
 fi
 
-# ════════════════ ۲) Node.js ════════════════
+# ════════════════ 2) Node.js ════════════════
 NEED_NODE=1
 if command -v node >/dev/null 2>&1; then
   CUR_MAJOR=$(node -p "parseInt(process.versions.node)" 2>/dev/null || echo 0)
-  [[ "$CUR_MAJOR" -ge 20 ]] && NEED_NODE=0 && ok "Node.js $(node -v) از قبل موجود است"
+  [[ "$CUR_MAJOR" -ge 20 ]] && NEED_NODE=0 && ok "Node.js $(node -v) already installed"
 fi
 if [[ "$NEED_NODE" == "1" ]]; then
-  log "نصب Node.js ${NODE_MAJOR}…"
+  log "Installing Node.js ${NODE_MAJOR}…"
   curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR}.x" -o /tmp/nodesource_setup.sh \
-    || err "دانلود مخزن NodeSource ممکن نشد؛ اتصال اینترنت سرور را بررسی کنید."
+    || err "Could not download the NodeSource setup script; check the internet connection."
   bash /tmp/nodesource_setup.sh >/dev/null
   rm -f /tmp/nodesource_setup.sh
-  apt-get install -y nodejs >/dev/null || err "نصب Node.js ناموفق بود."
-  ok "Node.js $(node -v) نصب شد"
+  apt-get install -y nodejs >/dev/null || err "Node.js installation failed."
+  ok "Node.js $(node -v) installed"
 fi
 
-# ════════════════ ۳) PostgreSQL ════════════════
+# ════════════════ 3) PostgreSQL ════════════════
 if ! command -v psql >/dev/null 2>&1; then
-  log "نصب PostgreSQL…"
-  apt-get install -y postgresql >/dev/null || err "نصب PostgreSQL ناموفق بود."
+  log "Installing PostgreSQL…"
+  apt-get install -y postgresql >/dev/null || err "PostgreSQL installation failed."
 fi
 systemctl enable --now postgresql >/dev/null
-ok "PostgreSQL آماده است ($(psql --version | head -1))"
+ok "PostgreSQL is ready ($(psql --version | head -1))"
 
-# رمز دیتابیس
+# Database password
 if [[ -z "$DB_PASS" ]]; then
   DB_PASS=$(openssl rand -hex 16)
-  log "یک رمز امن تصادفی برای دیتابیس ساخته شد (در .env ذخیره می‌شود)"
+  log "Generated a secure random database password (stored in .env)"
 fi
 run_psql -c "ALTER USER ${DB_USER} WITH PASSWORD '${DB_PASS}';" >/dev/null
 if ! run_psql -tAc "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'" | grep -q 1; then
   run_psql -c "CREATE DATABASE ${DB_NAME};" >/dev/null
-  log "دیتابیس ${DB_NAME} ساخته شد"
+  log "Database ${DB_NAME} created"
 fi
-ok "دیتابیس آماده است"
+ok "Database is ready"
 
-# ════════════════ ۴) کپی کد پروژه ════════════════
+# ════════════════ 4) Copy project files ════════════════
 mkdir -p "$(dirname "$APP_DIR")"
 SRC_REAL="$(realpath "$SRC_DIR")"
 APP_REAL="$(realpath -m "$APP_DIR")"
 if [[ "$SRC_REAL" != "$APP_REAL" ]]; then
-  log "کپی پروژه از ${SRC_DIR} به ${APP_DIR}…"
-  # توجه: .git عمداً نگه داشته می‌شود تا «--update» بتواند بعداً پول کند
+  log "Copying project from ${SRC_DIR} to ${APP_DIR}…"
+  # NOTE: .git is intentionally kept so "--update" can pull later
   rsync -a --delete \
     --exclude node_modules --exclude .next \
     "${SRC_DIR}/" "${APP_DIR}/"
 fi
 cd "$APP_DIR"
-ok "کد پروژه در ${APP_DIR} قرار گرفت"
+ok "Project files are in ${APP_DIR}"
 
-# ════════════════ ۵) فایل .env ════════════════
-log "ساخت فایل .env…"
+# ════════════════ 5) .env file ════════════════
+log "Writing .env file…"
 cat > "${APP_DIR}/.env" <<EOF
 DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@127.0.0.1:5432/${DB_NAME}
 PORT=${APP_PORT}
 NODE_ENV=production
 EOF
 chmod 600 "${APP_DIR}/.env"
-ok "فایل .env ساخته شد"
+ok ".env file created"
 
-# ════════════════ ۶) وابستگی‌ها، اسکیما، سید، بیلد ════════════════
+# ════════════════ 6) Dependencies, schema, seed, build ════════════════
 export DATABASE_URL="postgresql://${DB_USER}:${DB_PASS}@127.0.0.1:5432/${DB_NAME}"
 
-log "نصب وابستگی‌های npm (ممکن است چند دقیقه طول بکشد)…"
+log "Installing npm dependencies (this may take a few minutes)…"
 npm ci --no-audit --no-fund || npm install --no-audit --no-fund
-ok "وابستگی‌ها نصب شدند"
+ok "Dependencies installed"
 
-log "اعمال اسکیما دیتابیس (drizzle-kit push)…"
-npx drizzle-kit push --force || err "اعمال اسکیما ناموفق بود؛ لاگ‌های بالا را بررسی کنید."
-ok "اسکیما اعمال شد"
+log "Applying database schema (drizzle-kit push)…"
+npx drizzle-kit push --force || err "Schema migration failed; check the logs above."
+ok "Schema applied"
 
 VIDEOS_COUNT=$(PGPASSWORD="$DB_PASS" psql -h 127.0.0.1 -U "$DB_USER" -d "$DB_NAME" -tAc "SELECT count(*) FROM videos" 2>/dev/null || echo 0)
 if [[ "$VIDEOS_COUNT" == "0" && -f "src/db/seed.sql" ]]; then
-  log "دیتابیس خالی است؛ داده‌های نمونه درج می‌شوند…"
+  log "Database is empty; inserting sample data…"
   PGPASSWORD="$DB_PASS" psql -h 127.0.0.1 -U "$DB_USER" -d "$DB_NAME" -f src/db/seed.sql >/dev/null \
-    || warn "درج داده‌های نمونه کامل نشد؛ پنل همچنان کار می‌کند."
-  ok "داده‌های نمونه افزوده شد"
+    || warn "Sample data import did not fully complete; the panel still works."
+  ok "Sample data inserted"
 else
-  log "دیتابیس دارای داده است؛ سید رد شد"
+  log "Database already has data; seeding skipped"
 fi
 
-log "بیلد پروداکشن (npm run build)…"
-npm run build || err "بیلد ناموفق بود؛ اگر رم سرور کم است، سواپ بسازید (راهنما در صفحه آموزش)."
-ok "بیلد با موفقیت انجام شد"
+log "Production build (npm run build)…"
+npm run build || err "Build failed; if the server has little RAM, add swap (see the README troubleshooting section)."
+ok "Build completed successfully"
 
-# ════════════════ ۷) سرویس سیستمی (systemd) ════════════════
-log "ساخت سرویس سیستمی ${SERVICE_NAME}…"
+# ════════════════ 7) systemd service ════════════════
+log "Creating systemd service ${SERVICE_NAME}…"
 id -u www-data >/dev/null 2>&1 || useradd -r -s /usr/sbin/nologin www-data
 chown -R www-data:www-data "$APP_DIR"
 
@@ -239,9 +239,9 @@ EOF
 systemctl daemon-reload
 systemctl enable --now "${SERVICE_NAME}"
 if systemctl is-active --quiet "${SERVICE_NAME}"; then
-  ok "سرویس ${SERVICE_NAME} فعال و در حال اجراست"
+  ok "Service ${SERVICE_NAME} is active and running"
   HEALTH_OK=0
-  log "در حال هلث‌چک اپلیکیشن (تا ۲۰ ثانیه)…"
+  log "Running application healthcheck (up to 20 seconds)…"
   for i in $(seq 1 10); do
     if curl -fsS "http://127.0.0.1:${APP_PORT}/api/health" >/dev/null 2>&1; then
       HEALTH_OK=1
@@ -250,18 +250,18 @@ if systemctl is-active --quiet "${SERVICE_NAME}"; then
     sleep 2
   done
   if [[ "$HEALTH_OK" == "1" ]]; then
-    ok "هلث‌چک اپلیکیشن پاسخ داد — همه‌چیز سالم است 🎯"
+    ok "Application healthcheck passed — everything is healthy 🎯"
   else
-    warn "اپ هنوز پاسخ نمی‌دهد؛ لاگ را ببینید: journalctl -u ${SERVICE_NAME} -n 50"
+    warn "App is not responding yet; check logs: journalctl -u ${SERVICE_NAME} -n 50"
   fi
 else
-  warn "سرویس فعال نشد — لاگ‌ها را ببینید: journalctl -u ${SERVICE_NAME} -n 50"
+  warn "Service did not become active — check logs: journalctl -u ${SERVICE_NAME} -n 50"
 fi
 
-# ════════════════ ۸) دامنه و SSL (اختیاری با Caddy) ════════════════
-WEBHOOK_HINT="http://YOUR_SERVER_IP:${APP_PORT}/api/webhook (برای تلگرام به دامنه و HTTPS نیاز دارید)"
+# ════════════════ 8) Domain & SSL (optional, Caddy) ════════════════
+WEBHOOK_HINT="http://YOUR_SERVER_IP:${APP_PORT}/api/webhook (Telegram requires a domain + HTTPS)"
 if [[ -n "$DOMAIN" ]]; then
-  log "نصب Caddy برای دامنه ${DOMAIN} و صدور گواهی SSL خودکار…"
+  log "Installing Caddy for ${DOMAIN} with automatic SSL…"
   CADDY_OK=0
   if apt-get install -y debian-keyring debian-archive-keyring apt-transport-https >/dev/null 2>&1 \
      && curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' \
@@ -280,49 +280,49 @@ ${DOMAIN} {
 EOF
     systemctl enable --now caddy >/dev/null 2>&1 || true
     systemctl restart caddy >/dev/null 2>&1 || true
-    ok "Caddy فعال شد — ظرف چند لحظه گواهی SSL برای ${DOMAIN} صادر می‌شود"
+    ok "Caddy is up — an SSL certificate for ${DOMAIN} will be issued within moments"
     WEBHOOK_HINT="https://${DOMAIN}/api/webhook"
   else
-    warn "نصب Caddy ناموفق بود؛ نصب کامل شد ولی بدون SSL."
-    warn "اپ روی پورت ${APP_PORT} در دسترس است. برای فعال‌سازی دامنه، دستورهای صفحه آموزش را ببینید."
+    warn "Caddy installation failed; the app is still installed and running without SSL."
+    warn "The app is reachable on port ${APP_PORT}. See the README for manual domain setup."
   fi
 fi
 
-# ════════════════ ۹) فایروال ════════════════
+# ════════════════ 9) Firewall ════════════════
 if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "Status: active"; then
   ufw allow OpenSSH >/dev/null 2>&1 || true
   ufw allow 80/tcp >/dev/null 2>&1 || true
   ufw allow 443/tcp >/dev/null 2>&1 || true
   if [[ -z "$DOMAIN" ]]; then ufw allow "${APP_PORT}/tcp" >/dev/null 2>&1 || true; fi
-  ok "پورت‌های لازم در فایروال باز شدند"
+  ok "Required ports opened in the firewall"
 fi
 
-# ════════════════ خلاصه پایانی ════════════════
+# ════════════════ Final summary ════════════════
 SERVER_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "YOUR_SERVER_IP")
 echo ""
 echo "════════════════════════════════════════════════════════"
-echo -e "${C_OK}   🎉 نصب با موفقیت کامل شد!${C_OFF}"
+echo -e "${C_OK}   🎉 Installation completed successfully!${C_OFF}"
 echo "════════════════════════════════════════════════════════"
 echo ""
-echo "   🌐 آدرس پنل:"
+echo "   🌐 Panel URL:"
 if [[ -n "$DOMAIN" ]]; then
   echo "      https://${DOMAIN}"
 else
   echo "      http://${SERVER_IP}:${APP_PORT}"
 fi
 echo ""
-echo "   🔑 رمز دیتابیس شما (در ${APP_DIR}/.env ذخیره شده):"
+echo "   🔑 Database password (saved in ${APP_DIR}/.env):"
 echo "      ${DB_PASS}"
 echo ""
-echo "   📡 آدرس وب‌هوک تلگرام (بعد از ساخت ربات در پنل وارد کنید):"
+echo "   📡 Telegram webhook URL (set it after creating your bot):"
 echo "      ${WEBHOOK_HINT}"
 echo ""
-echo "   دستورات مدیریتی:"
-echo "      sudo systemctl status ${SERVICE_NAME}     ← وضعیت سرویس"
-echo "      sudo systemctl restart ${SERVICE_NAME}    ← ری‌استارت"
-echo "      journalctl -fu ${SERVICE_NAME}            ← لاگ زنده"
-echo "      sudo bash ${APP_DIR}/setup.sh --update    ← به‌روزرسانی"
-echo "      sudo bash ${APP_DIR}/setup.sh --status    ← گزارش سریع"
+echo "   Management commands:"
+echo "      sudo systemctl status ${SERVICE_NAME}     ← service status"
+echo "      sudo systemctl restart ${SERVICE_NAME}    ← restart"
+echo "      journalctl -fu ${SERVICE_NAME}            ← live logs"
+echo "      sudo bash ${APP_DIR}/setup.sh --update    ← update"
+echo "      sudo bash ${APP_DIR}/setup.sh --status    ← quick report"
 echo ""
-echo "   مراحل بعدی را در صفحه «آموزش راه‌اندازی» داخل پنل ببینید."
+echo "   Next steps: see the README or the in-app “Setup Guide” page."
 echo "════════════════════════════════════════════════════════"
