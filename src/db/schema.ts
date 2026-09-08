@@ -29,6 +29,7 @@ export const videos = pgTable("videos", {
   shares: integer("shares").notNull().default(0),
   comments: integer("comments").notNull().default(0),
   hashtags: text("hashtags").notNull().default(""),
+  fileUrl: text("file_url").notNull().default(""),
   thumbnail: text("thumbnail").notNull().default(""),
   voiceStyle: text("voice_style").notNull().default("شاد و کودکانه"),
   safeChecked: boolean("safe_checked").notNull().default(true),
@@ -46,6 +47,7 @@ export const accounts = pgTable("accounts", {
   accessToken: text("access_token").notNull().default(""),
   refreshToken: text("refresh_token").notNull().default(""),
   tokenExpiresAt: timestamp("token_expires_at"),
+  sessionCookie: text("session_cookie").notNull().default(""),
   avatar: text("avatar").notNull().default(""),
   connectedAt: timestamp("connected_at").notNull().defaultNow(),
 });
@@ -74,4 +76,5 @@ export const settings = pgTable("settings", {
   onboardingDone: boolean("onboarding_done").notNull().default(false),
   tiktokClientKey: text("tiktok_client_key").notNull().default(""),
   tiktokClientSecret: text("tiktok_client_secret").notNull().default(""),
+  ayrshareKey: text("ayrshare_key").notNull().default(""),
 });

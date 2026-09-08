@@ -121,11 +121,36 @@ export async function publishVideo(id: number, boosted = false) {
   const acc = accId
     ? (await db.select().from(accounts).where(eq(accounts.id, accId)).limit(1))[0]
     : null;
-  await addLog(
-    "tiktok",
-    "info",
-    `ویدئوی «${pub.title}» روی حساب @${acc?.username ?? "نامشخص"} در تیک‌تاک آپلود و منتشر شد ✅`
-  );
+
+  // Real posting via the Ayrshare relay — only when both an API key and an
+  // actual video file are attached. Otherwise the pipeline stays in demo mode.
+  const st = await getSettings();
+  if (st.ayrshareKey && pub.fileUrl) {
+    const { postViaAyrshare } = await import("./tiktok");
+    const result = await postViaAyrshare(st.ayrshareKey, {
+      text: `${pub.title} ${pub.hashtags}`,
+      videoUrl: pub.fileUrl,
+    });
+    if (result.ok) {
+      await addLog(
+        "tiktok",
+        "info",
+        `ویدئوی «${pub.title}» از طریق Ayrshare واقعاً در تیک‌تاک آپلود شد ✅ (شناسه پست: ${result.id ?? "—"})`
+      );
+    } else {
+      await addLog(
+        "tiktok",
+        "error",
+        `آپلود واقعی «${pub.title}» از طریق Ayrshare ناموفق بود: ${result.error}`
+      );
+    }
+  } else {
+    await addLog(
+      "tiktok",
+      "info",
+      `ویدئوی «${pub.title}» روی حساب @${acc?.username ?? "نامشخص"} در تیک‌تاک آپلود و منتشر شد ✅`
+    );
+  }
   return pub;
 }
 

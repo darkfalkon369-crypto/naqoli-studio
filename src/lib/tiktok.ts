@@ -129,6 +129,77 @@ export interface TikTokProfile {
   avatar: string;
 }
 
+/**
+ * Validate a web session cookie by asking TikTok for the user's profile.
+ * Returns the profile when the session is valid; null when it is not
+ * (or when TikTok blocks the check from this server — callers should
+ * treat null as "not validated" rather than "definitely invalid").
+ */
+export async function validateSession(
+  username: string,
+  sessionCookie: string
+): Promise<TikTokProfile | null> {
+  try {
+    const res = await fetch(
+      `https://www.tiktok.com/api/user/detail/?uniqueId=${encodeURIComponent(username)}`,
+      {
+        headers: {
+          cookie: `sessionid=${sessionCookie}`,
+          "user-agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
+          referer: "https://www.tiktok.com/",
+        },
+      }
+    );
+    const body = await res.json().catch(() => ({}));
+    const u = body?.userInfo?.user;
+    if (!u || !u.id) return null;
+    return {
+      openId: String(u.id),
+      username: String(u.uniqueId ?? username),
+      displayName: String(u.nickname ?? username),
+      avatar: String(u.avatarThumb ?? ""),
+    };
+  } catch {
+    return null;
+  }
+}
+
+export interface AyrshareResult {
+  ok: boolean;
+  id?: string;
+  error?: string;
+}
+
+/** Publish a real video file through the Ayrshare relay service. */
+export async function postViaAyrshare(
+  apiKey: string,
+  opts: { text: string; videoUrl: string }
+): Promise<AyrshareResult> {
+  try {
+    const res = await fetch("https://app.ayrshare.com/api/post", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        post: opts.text,
+        platforms: ["tiktok"],
+        mediaUrls: [{ url: opts.videoUrl, type: "video" }],
+      }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return { ok: false, error: body?.message ?? body?.error ?? `HTTP ${res.status}` };
+    }
+    const id = Array.isArray(body?.postIds) ? body.postIds[0]?.id : body?.id;
+    return { ok: true, id: id ? String(id) : undefined };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "network error" };
+  }
+}
+
 /** Step 4: fetch the authorized user's profile. */
 export async function fetchProfile(accessToken: string, openId: string): Promise<TikTokProfile> {
   const res = await fetch(`${API}/v2/user/info/?fields=open_id,username,display_name,avatar_url_100`, {

@@ -22,6 +22,13 @@
       "when": 1788895276012,
       "tag": "0002_real_dark_beast",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1788898115406,
+      "tag": "0003_dapper_wolfsbane",
+      "breakpoints": true
     }
   ]
 }

@@ -4,10 +4,12 @@ import { useEffect, useState } from "react";
 import {
   IconCheck,
   IconFilm,
+  IconKey,
   IconPlus,
   IconRefresh,
   IconTiktok,
   IconUsers,
+  IconZap,
 } from "@/components/icons";
 import { Badge, Btn, Card, CardHead, Toggle, cn } from "@/components/ui";
 import { api, bump, toast, useFetch } from "@/lib/api";
@@ -133,6 +135,8 @@ export default function AccountsPage() {
       </Card>
 
       <TikTokQrCard />
+      <SessionCard />
+      <AyrshareCard />
 
       {/* TikTok connection guide */}
       <Card className="animate-pop overflow-hidden">
@@ -431,6 +435,162 @@ function TikTokQrCard() {
             </>
           )}
         </div>
+      </div>
+    </Card>
+  );
+}
+
+// ═══════════════ Session cookie connection (no approval needed) ═══════════════
+
+function SessionCard() {
+  const [username, setUsername] = useState("");
+  const [session, setSession] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{ validated: boolean; username: string } | null>(null);
+  const [error, setError] = useState("");
+
+  async function connect() {
+    setBusy(true);
+    setError("");
+    setResult(null);
+    try {
+      const r = await api<{ ok: true; validated: boolean; account: { username: string } }>(
+        "/api/tiktok/session",
+        {
+          method: "POST",
+          body: JSON.stringify({ action: "connect", username, sessionCookie: session }),
+        }
+      );
+      setResult({ validated: r.validated, username: r.account.username });
+      toast(r.validated ? "✅ نشست تأیید و حساب متصل شد" : "حساب ذخیره شد — تأیید هنگام انتشار انجام می‌شود");
+      bump();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "خطا در اتصال");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card className="animate-pop overflow-hidden">
+      <CardHead
+        icon={<IconKey className="h-5 w-5" />}
+        title="اتصال سریع با نشست وب (بدون نیاز به تأیید)"
+        sub="رایگان و فوری — کپی نشست مرورگر، بدون هیچ اپ توسعه‌دهنده‌ای"
+        extra={<Badge tone="sun">غیررسمی</Badge>}
+      />
+      <div className="grid gap-5 p-5 lg:grid-cols-2">
+        <div className="space-y-3">
+          <div>
+            <p className="mb-1.5 text-xs font-bold text-ink-700">نام کاربری تیک‌تاک</p>
+            <input
+              dir="ltr"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="my_kids_channel"
+              className="w-full rounded-xl border border-line bg-cream px-4 py-2.5 text-sm outline-none focus:border-sun-400 focus:bg-paper"
+            />
+          </div>
+          <div>
+            <p className="mb-1.5 text-xs font-bold text-ink-700">Session ID</p>
+            <input
+              dir="ltr"
+              value={session}
+              onChange={(e) => setSession(e.target.value)}
+              placeholder="مقدار کوکی sessionid"
+              className="w-full rounded-xl border border-line bg-cream px-4 py-2.5 font-mono text-xs outline-none focus:border-sun-400 focus:bg-paper"
+            />
+          </div>
+          {error && (
+            <p className="rounded-lg bg-[#fde3e1] px-3 py-2 text-xs font-bold text-ruby-500">{error}</p>
+          )}
+          {result && (
+            <p className="rounded-lg border border-teal-100 bg-teal-50 px-3 py-2 text-xs font-bold text-teal-700">
+              {result.validated
+                ? `✅ نشست @${result.username} تأیید شد و اتصال برقرار است`
+                : `حساب @${result.username} ذخیره شد؛ اعتبارسنجی از این سرور ممکن نشد ولی نشست برای انتشار نگه داشته شد`}
+            </p>
+          )}
+          <Btn variant="dark" onClick={connect} disabled={busy || !username || !session} className="w-full">
+            {busy ? "در حال بررسی نشست…" : "🔗 اتصال با این نشست"}
+          </Btn>
+        </div>
+        <div className="rounded-xl border border-sun-300/40 bg-sun-100/40 p-4">
+          <p className="text-xs font-bold text-sun-600">📋 چطور Session ID بگیرم؟</p>
+          <ol className="mt-2 space-y-1.5 text-[11px] leading-5 text-ink-700">
+            <li>۱. در کامپیوتر وارد <b dir="ltr">tiktok.com</b> شوید (با همان حسابی که می‌خواهید وصل کنید)</li>
+            <li>۲. کلید <b>F12</b> را بزنید تا ابزار توسعه‌دهنده باز شود</li>
+            <li>۳. تب <b dir="ltr">Application</b> ← بخش <b dir="ltr">Cookies</b> ← <b dir="ltr">https://www.tiktok.com</b></li>
+            <li>۴. کوکی <b dir="ltr">sessionid</b> را پیدا و مقدارش را کپی کنید</li>
+            <li>۵. همین‌جا جای‌گذاری و «اتصال» را بزنید</li>
+          </ol>
+          <p className="mt-3 rounded-lg bg-paper p-2 text-[10px] leading-4 text-ink-500">
+            ⚠️ این روش غیررسمی است؛ نشست هر چند وقت یک‌بار منقضی می‌شود و استفاده زیاد ممکن است
+            نیازمند ورود مجدد شود. برای کار جدی و پایدار، مسیر رسمی یا سرویس واسط توصیه می‌شود.
+          </p>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+// ═══════════════ Ayrshare relay (official, instant, paid) ═══════════════
+
+function AyrshareCard() {
+  const { data: settings } = useFetch<BotSettings>("/api/settings");
+  const [key, setKey] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (settings) setKey((k) => k || settings.ayrshareKey);
+  }, [settings]);
+
+  async function save() {
+    setBusy(true);
+    try {
+      await api("/api/settings", { method: "PATCH", body: JSON.stringify({ ayrshareKey: key.trim() }) });
+      toast("✅ کلید Ayrshare ذخیره شد");
+      bump();
+    } catch {
+      toast("خطا در ذخیره کلید");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card className="animate-pop overflow-hidden">
+      <CardHead
+        icon={<IconZap className="h-5 w-5" />}
+        title="انتشار از طریق سرویس واسط (Ayrshare)"
+        sub="رسمی و فوری — بدون انتظار برای تأیید، فقط با یک کلید"
+        extra={settings?.ayrshareKey ? <Badge tone="leaf">متصل</Badge> : <Badge tone="ink">بدون کلید</Badge>}
+      />
+      <div className="space-y-3 p-5">
+        <p className="text-xs leading-6 text-ink-700">
+          سرویس‌هایی مثل <b dir="ltr">Ayrshare</b> خودشان مجوز رسمی تیک‌تاک را دارند؛ شما فقط
+          حساب‌تان را در سایت آن‌ها وصل می‌کنید و یک <b>API Key</b> می‌گیرید. از آن لحظه، ربات
+          ویدئوها را از طریق آن‌ها واقعاً منتشر می‌کند — بدون هیچ انتظار برای تأیید.
+        </p>
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="min-w-52 flex-1">
+            <p className="mb-1.5 text-xs font-bold text-ink-700">API Key</p>
+            <input
+              dir="ltr"
+              value={key}
+              onChange={(e) => setKey(e.target.value)}
+              placeholder="AYRSHARE-API-KEY"
+              className="w-full rounded-xl border border-line bg-cream px-4 py-2.5 font-mono text-xs outline-none focus:border-teal-500 focus:bg-paper"
+            />
+          </div>
+          <Btn variant="teal" onClick={save} disabled={busy}>
+            {busy ? "در حال ذخیره…" : "ذخیره کلید"}
+          </Btn>
+        </div>
+        <p className="rounded-lg border border-line bg-cream p-2.5 text-[10px] leading-5 text-ink-500">
+          📌 برای انتشار واقعی، هر ویدئو باید یک فایل واقعی (لینک mp4) داشته باشد؛ کلید که ذخیره
+          شود، موتور انتشار به‌صورت خودکار از «حالت دمو» به «آپلود واقعی» تغییر می‌کند.
+        </p>
       </div>
     </Card>
   );

@@ -8,7 +8,15 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   const rows = await db.select().from(accounts);
-  return NextResponse.json(rows);
+  // mask credentials before they ever reach the client
+  const safe = rows.map((x) => ({
+    ...x,
+    accessToken: x.accessToken ? "••••••" : "",
+    sessionCookie: x.sessionCookie ? "••••••" : "",
+    tokenExpiresAt: x.tokenExpiresAt?.toISOString() ?? null,
+    connectedAt: x.connectedAt.toISOString(),
+  }));
+  return NextResponse.json(safe);
 }
 
 export async function POST(req: Request) {
