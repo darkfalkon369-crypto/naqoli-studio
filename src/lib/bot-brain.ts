@@ -7,7 +7,31 @@ import { createVideo, getSettings, publishVideo, updateSettings } from "./pipeli
 export interface ChatResult {
   reply: string;
   action?: string;
+  keyboard?: boolean;
 }
+
+/** Reply-keyboard buttons shown inside Telegram. */
+export const BOT_KEYBOARD = {
+  keyboard: [
+    ["🎬 ساخت ویدئو", "📊 آمار عملکرد"],
+    ["🚀 انتشار فوری", "🤖 وضعیت پایپ‌لاین"],
+    ["⏸️ توقف خودکار", "▶️ ادامه خودکار"],
+    ["📖 راهنما"],
+  ],
+  resize_keyboard: true,
+  is_persistent: true,
+};
+
+export const BOT_COMMANDS = [
+  { command: "start", description: "شروع و معرفی ربات" },
+  { command: "video", description: "ساخت ویدئوی جدید 🎬" },
+  { command: "stats", description: "گزارش عملکرد 📊" },
+  { command: "status", description: "وضعیت پایپ‌لاین 🤖" },
+  { command: "publish", description: "انتشار فوری همه 🚀" },
+  { command: "pause", description: "توقف تولید خودکار ⏸️" },
+  { command: "resume", description: "ادامه تولید خودکار ▶️" },
+  { command: "help", description: "راهنمای دستورها 📖" },
+];
 
 export async function handleBotMessage(text: string): Promise<ChatResult> {
   const t = text.trim();
@@ -31,21 +55,22 @@ export async function handleBotMessage(text: string): Promise<ChatResult> {
     .from(videos)
     .where(gte(videos.createdAt, start));
 
-  if (t.startsWith("/start") || t === "شروع") {
+  if (t.startsWith("/start") || t.includes("شروع")) {
     return {
       reply:
-        "سلام! 👋 به ربات «نقلی‌استودیو» خوش اومدی!\n🤖 من به‌صورت کاملاً خودکار ویدئوهای کودک می‌سازم و در تیک‌تاک منتشر می‌کنم:\n🎬 تولید ایده و فیلم‌نامه با هوش مصنوعی\n🎨 انیمیشن و صداگذاری خودکار\n🗓️ زمان‌بندی و آپلود خودکار در بهترین ساعت\n📊 گزارش لحظه‌ای عملکرد\nبرای دیدن دستورهای من /help را بفرست.",
+        "سلام! 👋 به ربات «نقلی‌استودیو» خوش اومدی!\n🤖 من به‌صورت کاملاً خودکار ویدئوهای کودک می‌سازم و در تیک‌تاک منتشر می‌کنم:\n🎬 تولید ایده و فیلم‌نامه با هوش مصنوعی\n🎨 انیمیشن و صداگذاری خودکار\n🗓️ زمان‌بندی و آپلود خودکار در بهترین ساعت\n📊 گزارش لحظه‌ای عملکرد\n\n🎛️ از دکمه‌های زیر برای کنترل ربات استفاده کن:",
+      keyboard: true,
     };
   }
 
-  if (t.startsWith("/help") || t === "راهنما") {
+  if (t.startsWith("/help") || t.includes("راهنما")) {
     return {
       reply:
         "📖 دستورهای ربات:\n/video — ساخت یک ویدئوی جدید همین حالا 🎬\n/stats — گزارش عملکرد کانال‌ها 📊\n/status — وضعیت لحظه‌ای پایپ‌لاین 🤖\n/pause — توقف تولید خودکار ⏸️\n/resume — ادامه تولید خودکار ▶️\n/publish — انتشار فوری همه ویدئوهای در صف 🚀",
     };
   }
 
-  if (t.startsWith("/video") || t === "ویدئو") {
+  if (t.startsWith("/video") || t.includes("ساخت ویدئو") || t === "ویدئو") {
     const v = await createVideo({}, "telegram");
     return {
       reply: `🎬 درخواست شما ثبت شد!\nموتور تولید، ویدئوی «${v.title}» را در دسته «${v.category}» می‌سازد.\n⏱️ حدود ۲ دقیقه دیگر آماده می‌شود و خودکار در صف انتشار قرار می‌گیرد.`,
@@ -53,13 +78,13 @@ export async function handleBotMessage(text: string): Promise<ChatResult> {
     };
   }
 
-  if (t.startsWith("/stats") || t === "آمار") {
+  if (t.startsWith("/stats") || t.includes("آمار")) {
     return {
       reply: `📊 گزارش عملکرد نقلی‌استودیو:\n👁️ مجموع بازدید: ${faCompact(totalViews)}\n❤️ دنبال‌کننده‌ها: ${faCompact(totalFollowers)}\n✅ ویدئوهای منتشرشده: ${faNum(published.length)}\n🗓️ در نوبت انتشار: ${faNum(scheduled.length)}\n🎬 تولید امروز: ${faNum(today)} از ${faNum(s.dailyLimit)}\n${s.autoGenerate ? "🟢 تولید خودکار فعال است" : "🔴 تولید خودکار متوقف است"}`,
     };
   }
 
-  if (t.startsWith("/status") || t === "وضعیت") {
+  if (t.startsWith("/status") || t.includes("وضعیت")) {
     const generating = await db
       .select()
       .from(videos)
@@ -73,7 +98,7 @@ export async function handleBotMessage(text: string): Promise<ChatResult> {
     };
   }
 
-  if (t.startsWith("/pause")) {
+  if (t.startsWith("/pause") || t.includes("توقف")) {
     await updateSettings({ autoGenerate: false });
     return {
       reply: "⏸️ تولید خودکار موقتاً متوقف شد. هر وقت خواستید با /resume ادامه دهید.",
@@ -81,7 +106,7 @@ export async function handleBotMessage(text: string): Promise<ChatResult> {
     };
   }
 
-  if (t.startsWith("/resume")) {
+  if (t.startsWith("/resume") || t.includes("ادامه")) {
     await updateSettings({ autoGenerate: true });
     return {
       reply: "▶️ تولید خودکار دوباره فعال شد! موتور در حال آماده‌سازی ایده بعدی است 🎨",
@@ -89,7 +114,7 @@ export async function handleBotMessage(text: string): Promise<ChatResult> {
     };
   }
 
-  if (t.startsWith("/publish")) {
+  if (t.startsWith("/publish") || t.includes("انتشار فوری")) {
     const waiting = await db
       .select()
       .from(videos)

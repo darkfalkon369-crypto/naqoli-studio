@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { handleBotMessage } from "@/lib/bot-brain";
+import { BOT_KEYBOARD, handleBotMessage } from "@/lib/bot-brain";
 import { addLog, getSettings } from "@/lib/pipeline";
 
 export const dynamic = "force-dynamic";
@@ -60,14 +60,16 @@ export async function POST(req: Request) {
   const result = await handleBotMessage(text);
 
   try {
+    const payload: Record<string, unknown> = {
+      chat_id: chatId,
+      text: result.reply,
+      disable_web_page_preview: true,
+    };
+    if (result.keyboard) payload.reply_markup = BOT_KEYBOARD;
     const res = await fetch(`https://api.telegram.org/bot${settings.botToken}/sendMessage`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: result.reply,
-        disable_web_page_preview: true,
-      }),
+      body: JSON.stringify(payload),
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok || body?.ok === false) {

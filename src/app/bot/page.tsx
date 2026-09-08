@@ -52,10 +52,25 @@ export default function BotPage() {
   const scroller = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    api<BotSettings>("/api/settings").then(setSettings).catch(() => {});
-    const h = () => api<BotSettings>("/api/settings").then(setSettings).catch(() => {});
-    window.addEventListener("pipeline:tick", h);
-    return () => window.removeEventListener("pipeline:tick", h);
+    // NOTE: intentionally NOT refetching on pipeline:tick —
+    // it would overwrite whatever the admin is typing right now.
+    api<BotSettings>("/api/settings")
+      .then(async (s) => {
+        let next = s;
+        const auto = `${window.location.origin}/api/webhook`;
+        if (!s.webhookUrl.trim() || s.webhookUrl.includes("yourdomain")) {
+          try {
+            next = await api<BotSettings>("/api/settings", {
+              method: "PATCH",
+              body: JSON.stringify({ webhookUrl: auto }),
+            });
+          } catch {
+            /* keep local value */
+          }
+        }
+        setSettings(next);
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -88,6 +103,56 @@ export default function BotPage() {
     toast(msg);
     setSettings((s) => (s ? { ...s, ...patch } : s));
     bump();
+  }
+
+  async function saveAll() {
+    if (!settings) return;
+    try {
+      await api("/api/settings", {
+        method: "PATCH",
+        body: JSON.stringify({
+          botToken: settings.botToken,
+          chatId: settings.chatId,
+          webhookUrl: settings.webhookUrl,
+        }),
+      });
+      toast("✅ پیکربندی ربات ذخیره شد");
+      bump();
+    } catch {
+      toast("خطا در ذخیره پیکربندی");
+    }
+  }
+
+  async function enableMenu() {
+    if (!settings?.botToken.trim()) {
+      toast("ابتدا توکن ربات را ذخیره کنید");
+      return;
+    }
+    try {
+      const r = await api<{ ok: boolean; keyboardSent: boolean; warnings?: string[] }>(
+        "/api/bot/menu",
+        { method: "POST" }
+      );
+      if (r.keyboardSent) toast("🎛️ منوی دکمه‌ای فعال و برای چت ادمین ارسال شد");
+      else if (r.ok) toast("فهرست دستورها ثبت شد — برای کیبورد، شناسه چت ادمین را ذخیره کنید");
+      else toast("خطا در فعال‌سازی منو");
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "خطا در فعال‌سازی منو");
+    }
+  }
+
+  async function copyWebhookCommand() {
+    if (!settings) return;
+    const url = settings.webhookUrl.trim() || `${window.location.origin}/api/webhook`;
+    const token = settings.botToken.trim() || "<TOKEN>";
+    try {
+      await navigator.clipboard.writeText(
+        `curl -F "url=${url}" "https://api.telegram.org/bot${token}/setWebhook"`
+      );
+      toast("دستور ثبت وب‌هوک کپی شد 📋");
+    } catch {
+      toast("کپی ناموفق بود");
+    }
   }
 
   return (
@@ -223,21 +288,20 @@ export default function BotPage() {
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Btn
-                variant="teal"
-                onClick={() => toast("🔔 اعلان آزمایشی برای ادمین ارسال شد")}
-              >
-                ارسال اعلان آزمایشی
+              <Btn variant="teal" onClick={saveAll}>
+                💾 ذخیره پیکربندی
               </Btn>
-              <Btn
-                variant="soft"
-                onClick={async () => {
-                  toast("⚙️ وب‌هوک با موفقیت تنظیم شد");
-                }}
-              >
-                تنظیم مجدد وب‌هوک
+              <Btn variant="primary" onClick={enableMenu}>
+                🎛️ فعال‌سازی منوی دکمه‌ای ربات
+              </Btn>
+              <Btn variant="soft" onClick={copyWebhookCommand}>
+                📋 کپی دستور ثبت وب‌هوک
               </Btn>
             </div>
+            <p className="rounded-lg border border-line bg-cream p-2.5 text-[10px] leading-5 text-ink-500">
+              ترتیب کار: ۱) توکن و شناسه چت را ذخیره کنید ← ۲) «فعال‌سازی منوی دکمه‌ای» را بزنید
+              تا دکمه‌ها در تلگرام ظاهر شوند ← ۳) دستور ثبت وب‌هوک را کپی و اجرا کنید.
+            </p>
           </div>
         </Card>
 
