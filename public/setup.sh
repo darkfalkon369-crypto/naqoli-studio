@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ════════════════════════════════════════════════════════════════
-#   🤖 Naqoli Studio — Setup Script (v2.5.1)
+#   🤖 Naqoli Studio — Setup Script (v2.5.2)
 #   Fully automated kids-video bot for TikTok + Telegram management
 #
 #   Supported OS: Ubuntu 20.04+ / Debian 11+
@@ -78,7 +78,7 @@ run_psql() { sudo -u postgres psql "$@"; }
 
 echo ""
 echo "════════════════════════════════════════════"
-echo "   🤖 Naqoli Studio Installer — v2.5.1"
+echo "   🤖 Naqoli Studio Installer — v2.5.2"
 echo "════════════════════════════════════════════"
 echo ""
 
@@ -217,13 +217,31 @@ npm ci --no-audit --no-fund || npm install --no-audit --no-fund
 ok "Dependencies installed"
 
 log "Applying database schema (drizzle-kit push)…"
-if ! npx drizzle-kit push --force; then
-  warn "drizzle-kit push failed; retrying once after a short wait…"
-  sleep 3
-  npx drizzle-kit push --force \
-    || err "Schema migration failed. Run this to see the exact error:  PGPASSWORD=\"\$DB_PASS\" psql -h 127.0.0.1 -U postgres -d ${DB_NAME} -c 'SELECT 1;'  — then check pg_hba.conf and free RAM."
+if npx drizzle-kit push --force >/tmp/naqoli-schema.log 2>&1; then
+  ok "Schema applied"
+else
+  # Known issue: drizzle-kit "push" can fail silently on some servers while
+  # introspecting the live database. Fallback: apply committed SQL migrations
+  # with drizzle-orm's migrate() — idempotent and connection-tracked.
+  warn "drizzle-kit push failed; falling back to SQL migrations (drizzle-orm migrate)…"
+  if ! ls drizzle/*.sql >/dev/null 2>&1; then
+    npx drizzle-kit generate >/dev/null 2>&1 || true
+  fi
+  if ls drizzle/*.sql >/dev/null 2>&1 && node -e "
+    const { drizzle } = require('drizzle-orm/node-postgres');
+    const { migrate } = require('drizzle-orm/node-postgres/migrator');
+    const { Pool } = require('pg');
+    const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+    migrate(drizzle(pool), { migrationsFolder: './drizzle' })
+      .then(() => process.exit(0))
+      .catch((e) => { console.error('MIGRATE ERROR:', e.message); process.exit(1); });
+  "; then
+    ok "Schema applied via SQL migrations (fallback path)"
+  else
+    tail -15 /tmp/naqoli-schema.log
+    err "Schema migration failed via both methods; see the logs above."
+  fi
 fi
-ok "Schema applied"
 
 VIDEOS_COUNT=$(PGPASSWORD="$DB_PASS" psql -h 127.0.0.1 -U "$DB_USER" -d "$DB_NAME" -tAc "SELECT count(*) FROM videos" 2>/dev/null || echo 0)
 if [[ "$VIDEOS_COUNT" == "0" && -f "src/db/seed.sql" ]]; then
