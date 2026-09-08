@@ -35,21 +35,31 @@
 
 ## ۱) انتقال پروژه به سرور
 
-```bash
-# روی کامپیوتر خودتان
-scp -r naqoli-studio/ root@YOUR_SERVER_IP:/root/naqoli-studio
+**راه اول (توصیه‌شده) — نصب مستقیم از گیت‌هاب با یک دستور روی سرور:**
 
-# یا اگر روی گیت‌هاب کلون شده:
-git clone <آدرس مخزن> /root/naqoli-studio
+```bash
+git clone https://github.com/darkfalkon369-crypto/naqoli-studio.git /root/naqoli-studio
+```
+
+**راه دوم — انتقال از کامپیوتر شخصی:**
+
+```bash
+scp -r naqoli-studio/ root@YOUR_SERVER_IP:/root/naqoli-studio
 ```
 
 ## ۲) اجرای اسکریپت راه‌انداز
 
-اسکریپت `setup.sh` همه‌چیز را خودکار نصب می‌کند:
+اسکریپت `setup.sh` در **ریشه پروژه** قرار دارد و همه‌چیز را خودکار نصب می‌کند:
 
 ```bash
 cd /root/naqoli-studio
 sudo bash setup.sh --domain yourdomain.com
+```
+
+**نصب تک‌خطی (کلون + نصب کامل):**
+
+```bash
+git clone https://github.com/darkfalkon369-crypto/naqoli-studio.git /root/naqoli-studio && cd /root/naqoli-studio && sudo bash setup.sh --domain yourdomain.com
 ```
 
 کارهایی که اسکریپت انجام می‌دهد:
