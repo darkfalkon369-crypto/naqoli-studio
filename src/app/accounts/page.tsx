@@ -132,6 +132,58 @@ export default function AccountsPage() {
         </div>
       </Card>
 
+      {/* TikTok connection guide */}
+      <Card className="animate-pop overflow-hidden">
+        <CardHead
+          icon={<IconTiktok className="h-5 w-5" />}
+          title="راهنمای اتصال تیک‌تاک — آسان یا رسمی؟"
+          sub="سه راه برای آپلود خودکار؛ صادقانه و شفاف"
+        />
+        <div className="grid gap-4 p-5 lg:grid-cols-3">
+          <div className="rounded-xl border border-teal-100 bg-teal-50/60 p-4">
+            <p className="text-sm font-bold text-teal-700">🟢 راه رسمی (پیشنهادی)</p>
+            <p className="mt-1 text-[11px] font-bold text-ink-500">TikTok Content Posting API</p>
+            <ol className="mt-2 space-y-1.5 text-[11px] leading-5 text-ink-700">
+              <li>۱. در developers.tiktok.com حساب بسازید</li>
+              <li>۲. اپلیکیشنی با دسترسی Content Posting API ثبت کنید</li>
+              <li>۳. اپ را برای بررسی بفرستید (چند روز طول می‌کشد)</li>
+              <li>۴. توکن‌ها را بگیرید و در .env سرور بگذارید</li>
+              <li>۵. ری‌استارت سرویس — آپلود واقعاً خودکار می‌شود</li>
+            </ol>
+            <p className="mt-2 rounded-lg bg-paper p-2 text-[10px] leading-4 text-ink-500">
+              💡 با حساب تجاری (Business) ویدئوها مستقیم منتشر می‌شوند؛ با حساب شخصی ابتدا
+              «خصوصی/در بررسی» می‌خورند و باید دستی تأیید کنید.
+            </p>
+          </div>
+          <div className="rounded-xl border border-sun-300/50 bg-sun-100/50 p-4">
+            <p className="text-sm font-bold text-sun-600">🟡 راه آسان‌تر (سرویس واسط)</p>
+            <p className="mt-1 text-[11px] font-bold text-ink-500">بدون دردسر تأیید اپ</p>
+            <ul className="mt-2 space-y-1.5 text-[11px] leading-5 text-ink-700">
+              <li>• سرویس‌هایی مثل Ayrshare، Metricool یا Publer</li>
+              <li>• خودشان مجوز تیک‌تاک را دارند؛ فقط یک API Key می‌گیرید</li>
+              <li>• اتصال در چند دقیقه به‌جای چند روز</li>
+              <li>• کلید را در .env می‌گذارید و ربات همان‌جا آپلود می‌کند</li>
+            </ul>
+            <p className="mt-2 rounded-lg bg-paper p-2 text-[10px] leading-4 text-ink-500">
+              💰 معمولاً اشتراک ماهانه دارند، ولی سریع‌ترین راه برای شروع واقعی است.
+            </p>
+          </div>
+          <div className="rounded-xl border border-[#fbd0cc] bg-[#fde3e1]/50 p-4">
+            <p className="text-sm font-bold text-ruby-500">🔴 ورود مستقیم با یوزرنیم/رمز</p>
+            <p className="mt-1 text-[11px] font-bold text-ink-500">توصیه نمی‌شود</p>
+            <ul className="mt-2 space-y-1.5 text-[11px] leading-5 text-ink-700">
+              <li>• خلاف قوانین تیک‌تاک است</li>
+              <li>• کپچا، تأیید دومرحله‌ای و بلاک‌شدن مکرر نشست‌ها</li>
+              <li>• ریسک بالای بن‌شدن دائمی حساب</li>
+              <li>• نیاز به نگهداری مداوم و شکننده</li>
+            </ul>
+            <p className="mt-2 rounded-lg bg-paper p-2 text-[10px] leading-4 text-ink-500">
+              ⛔ این پنل عمداً این روش را پیاده نمی‌کند تا حساب شما به خطر نیفتد.
+            </p>
+          </div>
+        </div>
+      </Card>
+
       {/* accounts grid */}
       <div className="grid gap-4 lg:grid-cols-2">
         {(accounts ?? []).map((a) => (

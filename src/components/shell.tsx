@@ -116,6 +116,7 @@ export function Shell({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<BotSettings | null>(null);
 
   useEffect(() => {
+    if (pathname === "/login") return;
     const load = () =>
       api<BotSettings>("/api/settings")
         .then(setSettings)
@@ -124,9 +125,23 @@ export function Shell({ children }: { children: ReactNode }) {
     const h = () => load();
     window.addEventListener("pipeline:tick", h);
     return () => window.removeEventListener("pipeline:tick", h);
-  }, []);
+  }, [pathname]);
+
+  // صفحه ورود، پوسته مدیریتی ندارد
+  if (pathname === "/login") {
+    return <>{children}</>;
+  }
 
   const autopilot = !!settings && (settings.autoGenerate || settings.autoPublish);
+
+  async function logout() {
+    try {
+      await api("/api/auth", { method: "POST", body: JSON.stringify({ action: "logout" }) });
+    } catch {
+      /* ignore */
+    }
+    window.location.href = "/login";
+  }
   const today = new Date().toLocaleDateString("fa-IR", {
     weekday: "long",
     day: "numeric",
@@ -152,16 +167,24 @@ export function Shell({ children }: { children: ReactNode }) {
             <SideLink key={n.href} {...n} active={pathname === n.href} />
           ))}
         </nav>
-        <div className="mt-auto rounded-xl border border-white/10 bg-white/5 p-3.5">
-          <div className="flex items-center gap-2">
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="absolute h-full w-full animate-pulse-dot rounded-full bg-leaf-600" />
-            </span>
-            <p className="text-xs font-bold text-cream">موتور خودکار متصل</p>
+        <div className="mt-auto space-y-2">
+          <div className="rounded-xl border border-white/10 bg-white/5 p-3.5">
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="absolute h-full w-full animate-pulse-dot rounded-full bg-leaf-600" />
+              </span>
+              <p className="text-xs font-bold text-cream">موتور خودکار متصل</p>
+            </div>
+            <p className="mt-2 text-[10px] leading-5 text-cream/50">
+              نسخه موتور ۲.۴ — اتصال تلگرام و تیک‌تاک پایدار
+            </p>
           </div>
-          <p className="mt-2 text-[10px] leading-5 text-cream/50">
-            نسخه موتور ۲.۴ — اتصال تلگرام و تیک‌تاک پایدار
-          </p>
+          <button
+            onClick={logout}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 px-3 py-2.5 text-xs font-bold text-cream/60 transition-colors hover:bg-ruby-500/20 hover:text-ruby-500"
+          >
+            🚪 خروج از پنل
+          </button>
         </div>
       </aside>
 

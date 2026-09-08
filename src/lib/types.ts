@@ -55,6 +55,8 @@ export interface BotSettings {
   botToken: string;
   webhookUrl: string;
   chatId: string;
+  adminPasswordHash: string;
+  onboardingDone: boolean;
 }
 
 export interface Stats {

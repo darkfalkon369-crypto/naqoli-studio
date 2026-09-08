@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ════════════════════════════════════════════════════════════════
-#   🤖 Naqoli Studio — Setup Script (v2.5.2)
+#   🤖 Naqoli Studio — Setup Script (v2.6.0)
 #   Fully automated kids-video bot for TikTok + Telegram management
 #
 #   Supported OS: Ubuntu 20.04+ / Debian 11+
@@ -26,6 +26,7 @@ DOMAIN=""                       # empty = no domain/SSL
 NODE_MAJOR=22
 SERVICE_NAME="naqoli"
 ACTION="install"
+DEMO=0                          # 1 = insert sample demo data after install
 
 # ──────────── Colored output ────────────
 C_OK="\033[1;32m"; C_INFO="\033[1;36m"; C_WARN="\033[1;33m"; C_ERR="\033[1;31m"; C_OFF="\033[0m"
@@ -41,6 +42,7 @@ while [[ $# -gt 0 ]]; do
     --port)    APP_PORT="$2"; shift 2 ;;
     --app-dir) APP_DIR="$2"; shift 2 ;;
     --db-pass) DB_PASS="$2"; shift 2 ;;
+    --demo)    DEMO=1; shift ;;
     --update)  ACTION="update"; shift ;;
     --status)  ACTION="status"; shift ;;
     -h|--help) ACTION="help"; shift ;;
@@ -55,6 +57,7 @@ if [[ "$ACTION" == "help" ]]; then
   echo "  --port PORT        Application port (default: 3000)"
   echo "  --app-dir DIR      Install directory (default: /var/www/naqoli-studio)"
   echo "  --db-pass PASS     Database password (default: secure random)"
+  echo "  --demo             Insert sample demo data (default: clean panel)"
   echo "  --update           Pull latest code, rebuild and restart"
   echo "  --status           Service status and recent logs"
   exit 0
@@ -78,7 +81,7 @@ run_psql() { sudo -u postgres psql "$@"; }
 
 echo ""
 echo "════════════════════════════════════════════"
-echo "   🤖 Naqoli Studio Installer — v2.5.2"
+echo "   🤖 Naqoli Studio Installer — v2.6.0"
 echo "════════════════════════════════════════════"
 echo ""
 
@@ -201,13 +204,15 @@ ok "Project files are in ${APP_DIR}"
 
 # ════════════════ 5) .env file ════════════════
 log "Writing .env file…"
+AUTH_SECRET="$(openssl rand -hex 32)"
 cat > "${APP_DIR}/.env" <<EOF
 DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@127.0.0.1:5432/${DB_NAME}
 PORT=${APP_PORT}
 NODE_ENV=production
+AUTH_SECRET=${AUTH_SECRET}
 EOF
 chmod 600 "${APP_DIR}/.env"
-ok ".env file created"
+ok ".env file created (with a secure AUTH_SECRET for panel login)"
 
 # ════════════════ 6) Dependencies, schema, seed, build ════════════════
 export DATABASE_URL="postgresql://${DB_USER}:${DB_PASS}@127.0.0.1:5432/${DB_NAME}"
@@ -244,13 +249,13 @@ else
 fi
 
 VIDEOS_COUNT=$(PGPASSWORD="$DB_PASS" psql -h 127.0.0.1 -U "$DB_USER" -d "$DB_NAME" -tAc "SELECT count(*) FROM videos" 2>/dev/null || echo 0)
-if [[ "$VIDEOS_COUNT" == "0" && -f "src/db/seed.sql" ]]; then
-  log "Database is empty; inserting sample data…"
+if [[ "$DEMO" == "1" && "$VIDEOS_COUNT" == "0" && -f "src/db/seed.sql" ]]; then
+  log "Inserting sample demo data (--demo)…"
   PGPASSWORD="$DB_PASS" psql -h 127.0.0.1 -U "$DB_USER" -d "$DB_NAME" -f src/db/seed.sql >/dev/null \
     || warn "Sample data import did not fully complete; the panel still works."
   ok "Sample data inserted"
 else
-  log "Database already has data; seeding skipped"
+  log "Starting with a CLEAN panel (no demo data). The in-app Start Guide will walk you through setup."
 fi
 
 log "Production build (npm run build)…"
@@ -360,6 +365,9 @@ fi
 echo ""
 echo "   🔑 Database password (saved in ${APP_DIR}/.env):"
 echo "      ${DB_PASS}"
+echo ""
+echo "   🔐 First login: open the panel and set your admin password"
+echo "      (the panel is locked for everyone until you do)."
 echo ""
 echo "   📡 Telegram webhook URL (set it after creating your bot):"
 echo "      ${WEBHOOK_HINT}"

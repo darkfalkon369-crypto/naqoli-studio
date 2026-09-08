@@ -28,7 +28,34 @@ export async function POST(req: Request) {
   }
 
   const from = message?.from?.username ?? String(message?.from?.id ?? "نامشخص");
+
+  // ── Admin gate: only the configured admin chat gets real answers ──
+  const adminChat = settings.chatId.trim();
+  if (adminChat && String(chatId) !== adminChat) {
+    await addLog(
+      "telegram",
+      "info",
+      `پیام از کاربر غیرمجاز @${from} دریافت و نادیده گرفته شد 🔒 (فقط ادمین پاسخ می‌گیرد)`
+    );
+    return NextResponse.json({ ok: true, ignored: true });
+  }
   await addLog("telegram", "info", `پیام از @${from} دریافت شد: «${text}»`);
+
+  // Bootstrap: no admin configured yet → help the admin set the chat id
+  if (!adminChat) {
+    const bootstrap = `🔐 حالت راه‌اندازی اولیه:\nشناسه چت شما: ${chatId}\n\nاین شناسه را در پنل → بخش «ربات تلگرام ← پیکربندی اتصال» وارد و ذخیره کنید تا از این پس فقط شما از ربات پاسخ بگیرید و پیام بقیه نادیده گرفته شود.`;
+    try {
+      await fetch(`https://api.telegram.org/bot${settings.botToken}/sendMessage`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ chat_id: chatId, text: bootstrap }),
+      });
+    } catch {
+      /* network issues are logged elsewhere */
+    }
+    await addLog("telegram", "info", `راهنمای تنظیم شناسه ادمین برای @${from} ارسال شد`);
+    return NextResponse.json({ ok: true, bootstrap: true });
+  }
 
   const result = await handleBotMessage(text);
 

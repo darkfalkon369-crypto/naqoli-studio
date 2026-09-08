@@ -155,8 +155,72 @@ export default function SettingsPage() {
           <IconCheck className="h-5 w-5" />
           {saving ? "در حال ذخیره…" : "ذخیره تنظیمات اتوماسیون"}
         </Btn>
+
+        <PasswordCard />
       </div>
     </div>
+  );
+}
+
+function PasswordCard() {
+  const [pass, setPass] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function change() {
+    if (pass.length < 8) {
+      toast("رمز جدید باید حداقل ۸ کاراکتر باشد");
+      return;
+    }
+    if (pass !== confirm) {
+      toast("تکرار رمز یکسان نیست");
+      return;
+    }
+    setBusy(true);
+    try {
+      await api("/api/auth", {
+        method: "POST",
+        body: JSON.stringify({ action: "change-password", password: pass }),
+      });
+      toast("🔐 رمز عبور با موفقیت تغییر کرد");
+      setPass("");
+      setConfirm("");
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "خطا در تغییر رمز");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card className="animate-pop">
+      <CardHead
+        icon={<IconShield className="h-5 w-5" />}
+        title="امنیت پنل"
+        sub="تغییر رمز ورود مدیر"
+      />
+      <div className="space-y-3 p-5">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <input
+            type="password"
+            value={pass}
+            onChange={(e) => setPass(e.target.value)}
+            placeholder="رمز جدید (حداقل ۸ کاراکتر)"
+            className="w-full rounded-xl border border-line bg-cream px-4 py-2.5 text-sm outline-none focus:border-coral-500 focus:bg-paper"
+          />
+          <input
+            type="password"
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            placeholder="تکرار رمز جدید"
+            className="w-full rounded-xl border border-line bg-cream px-4 py-2.5 text-sm outline-none focus:border-coral-500 focus:bg-paper"
+          />
+        </div>
+        <Btn variant="dark" onClick={change} disabled={busy || !pass} className="w-full">
+          {busy ? "در حال تغییر…" : "تغییر رمز عبور"}
+        </Btn>
+      </div>
+    </Card>
   );
 }
 

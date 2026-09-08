@@ -15,10 +15,10 @@ import {
   IconZap,
 } from "@/components/icons";
 import { Badge, Card, CardHead, Empty, Progress, STATUS_META, StatusBadge, cn } from "@/components/ui";
-import { api, useFetch } from "@/lib/api";
+import { api, toast, useFetch } from "@/lib/api";
 import { CATEGORIES, STAGES, categoryOf } from "@/lib/catalog";
 import { faCompact, faDateTime, faNum, relTime } from "@/lib/format";
-import type { BotLog, Stats, Video } from "@/lib/types";
+import type { BotLog, BotSettings, Stats, Video } from "@/lib/types";
 
 const SOURCE_META: Record<string, { label: string; tone: string }> = {
   engine: { label: "موتور تولید", tone: "coral" },
@@ -33,6 +33,7 @@ export default function DashboardPage() {
   const { data: stats } = useFetch<Stats>("/api/stats");
   const { data: logs } = useFetch<BotLog[]>("/api/logs");
   const { data: generating } = useFetch<Video[]>("/api/videos?status=generating");
+  const { data: settings, refetch: refetchSettings } = useFetch<BotSettings>("/api/settings");
 
   if (!stats) {
     return (
@@ -51,6 +52,22 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-5">
+      {settings && !settings.onboardingDone && (
+        <Onboarding
+          settings={settings}
+          accounts={stats.accounts.length}
+          totalVideos={stats.publishedCount + stats.readyCount + stats.generatingCount}
+          onDone={async () => {
+            await api("/api/settings", {
+              method: "PATCH",
+              body: JSON.stringify({ onboardingDone: true }),
+            });
+            toast("🎉 راهنمای شروع بسته شد — موفق باشید!");
+            refetchSettings();
+          }}
+        />
+      )}
+
       {/* stat cards */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Card className="animate-pop p-5">
@@ -295,6 +312,98 @@ export default function DashboardPage() {
         </div>
       </Card>
     </div>
+  );
+}
+
+function Onboarding({
+  settings,
+  accounts,
+  totalVideos,
+  onDone,
+}: {
+  settings: BotSettings;
+  accounts: number;
+  totalVideos: number;
+  onDone: () => void;
+}) {
+  const tokenOk =
+    settings.botToken.trim() !== "" && !settings.botToken.includes("YOUR_TELEGRAM");
+  const steps = [
+    {
+      done: true,
+      label: "رمز عبور مدیر را تنظیم کردید",
+      hint: "پنل فقط برای شما قفل شد",
+      href: "",
+    },
+    {
+      done: accounts > 0,
+      label: "حساب تیک‌تاک را متصل کنید",
+      hint: "راهنمای گام‌به‌گام اتصال داخل صفحه حساب‌هاست",
+      href: "/accounts",
+    },
+    {
+      done: tokenOk,
+      label: "توکن ربات تلگرام را وارد کنید",
+      hint: "از BotFather بگیرید و در بخش ربات تلگرام ذخیره کنید",
+      href: "/bot",
+    },
+    {
+      done: totalVideos > 0,
+      label: "اولین ویدئو را بسازید",
+      hint: "استودیو تولید ← یک دسته انتخاب کنید ← تولید",
+      href: "/studio",
+    },
+  ];
+  return (
+    <Card className="animate-pop overflow-hidden border-teal-100">
+      <div className="flex flex-wrap items-center gap-3 border-b border-line bg-teal-50/70 px-5 py-4">
+        <span className="grid h-10 w-10 place-items-center rounded-xl bg-teal-500 text-xl text-white shadow-[0_4px_0_0_var(--color-teal-700)]">
+          🚀
+        </span>
+        <div className="min-w-0 flex-1">
+          <h2 className="font-display text-lg text-ink-900">راهنمای شروع سریع</h2>
+          <p className="text-xs text-ink-500">
+            نصب شما خام و آماده است — این چهار قدم را کامل کنید تا ربات تمام‌خودکار شود
+          </p>
+        </div>
+        <button
+          onClick={onDone}
+          className="rounded-lg border border-line bg-paper px-3 py-2 text-[11px] font-bold text-ink-500 transition-colors hover:bg-cream"
+        >
+          راهنما را بستن ✕
+        </button>
+      </div>
+      <div className="grid gap-0 divide-y divide-line sm:grid-cols-2 sm:divide-y-0">
+        {steps.map((s, i) => {
+          const inner = (
+            <div className="flex h-full items-start gap-3 px-5 py-4">
+              <span
+                className={
+                  s.done
+                    ? "mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-leaf-100 text-leaf-600"
+                    : "mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-ink-900/6 font-display text-xs text-ink-500"
+                }
+              >
+                {s.done ? "✓" : faNum(i + 1)}
+              </span>
+              <div className="min-w-0">
+                <p className={s.done ? "text-xs font-bold text-ink-300 line-through" : "text-xs font-bold"}>
+                  {s.label}
+                </p>
+                <p className="mt-1 text-[10px] leading-4 text-ink-500">{s.hint}</p>
+              </div>
+            </div>
+          );
+          return s.href && !s.done ? (
+            <a key={s.label} href={s.href} className="block transition-colors hover:bg-teal-50/50">
+              {inner}
+            </a>
+          ) : (
+            <div key={s.label}>{inner}</div>
+          );
+        })}
+      </div>
+    </Card>
   );
 }
 

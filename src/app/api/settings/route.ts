@@ -21,6 +21,7 @@ export async function PATCH(req: Request) {
     "botToken",
     "webhookUrl",
     "chatId",
+    "onboardingDone",
   ] as const;
   const patch: Record<string, unknown> = {};
   for (const k of allowed) {

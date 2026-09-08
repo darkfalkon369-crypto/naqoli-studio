@@ -19,3 +19,6 @@ npm-debug.log*
 .DS_Store
 vercel
 *.tsbuildinfo
+
+# local ops helpers
+tools/

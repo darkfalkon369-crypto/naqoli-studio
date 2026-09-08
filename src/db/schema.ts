@@ -65,4 +65,6 @@ export const settings = pgTable("settings", {
   botToken: text("bot_token").notNull().default(""),
   webhookUrl: text("webhook_url").notNull().default(""),
   chatId: text("chat_id").notNull().default(""),
+  adminPasswordHash: text("admin_password_hash").notNull().default(""),
+  onboardingDone: boolean("onboarding_done").notNull().default(false),
 });
