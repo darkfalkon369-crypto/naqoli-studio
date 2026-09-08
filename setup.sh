@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ════════════════════════════════════════════════════════════════
-#   🤖 Naqoli Studio — Setup Script (v2.5.0)
+#   🤖 Naqoli Studio — Setup Script (v2.5.1)
 #   Fully automated kids-video bot for TikTok + Telegram management
 #
 #   Supported OS: Ubuntu 20.04+ / Debian 11+
@@ -78,7 +78,7 @@ run_psql() { sudo -u postgres psql "$@"; }
 
 echo ""
 echo "════════════════════════════════════════════"
-echo "   🤖 Naqoli Studio Installer — v2.5.0"
+echo "   🤖 Naqoli Studio Installer — v2.5.1"
 echo "════════════════════════════════════════════"
 echo ""
 
@@ -161,6 +161,30 @@ if ! run_psql -tAc "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'" | grep
 fi
 ok "Database is ready"
 
+# ── Make sure PostgreSQL accepts password connections from localhost ──
+# (the #1 cause of "schema migration failed" on custom server images)
+HBA_FILE=$(sudo -u postgres psql -tAc "SHOW hba_file;" 2>/dev/null || true)
+if [[ -n "$HBA_FILE" && -f "$HBA_FILE" ]]; then
+  if ! grep -Eq "^host[[:space:]]+all[[:space:]]+all[[:space:]]+(127\.0\.0\.1/32|localhost)" "$HBA_FILE"; then
+    log "Adding password-auth rule for localhost to pg_hba.conf…"
+    {
+      echo "host all all 127.0.0.1/32 md5"
+      echo "host all all ::1/128 md5"
+    } >> "$HBA_FILE"
+    sudo -u postgres psql -c "SELECT pg_reload_conf();" >/dev/null
+    ok "pg_hba.conf updated and reloaded"
+  fi
+fi
+
+log "Verifying database connectivity over TCP…"
+if ! PGPASSWORD="$DB_PASS" psql -h 127.0.0.1 -U "$DB_USER" -d "$DB_NAME" -tAc "SELECT 1;" >/tmp/naqoli-dbcheck.log 2>&1; then
+  echo "──── database connection error ────"
+  cat /tmp/naqoli-dbcheck.log
+  echo "───────────────────────────────────"
+  err "Cannot connect to PostgreSQL at 127.0.0.1:5432. Fix the error above, then run this script again."
+fi
+ok "Database connection verified"
+
 # ════════════════ 4) Copy project files ════════════════
 mkdir -p "$(dirname "$APP_DIR")"
 SRC_REAL="$(realpath "$SRC_DIR")"
@@ -193,7 +217,12 @@ npm ci --no-audit --no-fund || npm install --no-audit --no-fund
 ok "Dependencies installed"
 
 log "Applying database schema (drizzle-kit push)…"
-npx drizzle-kit push --force || err "Schema migration failed; check the logs above."
+if ! npx drizzle-kit push --force; then
+  warn "drizzle-kit push failed; retrying once after a short wait…"
+  sleep 3
+  npx drizzle-kit push --force \
+    || err "Schema migration failed. Run this to see the exact error:  PGPASSWORD=\"\$DB_PASS\" psql -h 127.0.0.1 -U postgres -d ${DB_NAME} -c 'SELECT 1;'  — then check pg_hba.conf and free RAM."
+fi
 ok "Schema applied"
 
 VIDEOS_COUNT=$(PGPASSWORD="$DB_PASS" psql -h 127.0.0.1 -U "$DB_USER" -d "$DB_NAME" -tAc "SELECT count(*) FROM videos" 2>/dev/null || echo 0)
