@@ -113,7 +113,7 @@ fi
 # ════════════════ 1) Base packages ════════════════
 log "Installing base packages (apt)…"
 apt-get update -y >/dev/null || warn "apt-get update reported errors; continuing…"
-apt-get install -y curl ca-certificates gnupg git rsync openssl >/dev/null \
+apt-get install -y curl ca-certificates gnupg git rsync openssl ffmpeg fonts-dejavu-core >/dev/null \
   || err "Failed to install base packages; check the server's internet connection."
 ok "Base packages installed"
 
