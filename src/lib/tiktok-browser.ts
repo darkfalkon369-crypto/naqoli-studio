@@ -210,24 +210,37 @@ export async function loginWithPassword(
       return { status: "error", detail: "فیلد رمز عبور پیدا نشد." };
     }
 
-    // submit
+    // submit — try every known button shape, then fall back to Enter
     const submitSelectors = [
       '[data-e2e="login-submit-button"]',
       'button[type="submit"]',
       'button:has-text("Log in")',
+      'button:has-text("Log In")',
+      'input[type="submit"]',
+      'div[role="button"]:has-text("Log in")',
     ];
     let submitted = false;
     for (const sel of submitSelectors) {
       try {
-        await page.click(sel, { timeout: 4000 });
-        submitted = true;
-        break;
+        const loc = page.locator(sel).first();
+        if (await loc.isVisible({ timeout: 2000 })) {
+          await loc.click({ timeout: 4000 });
+          submitted = true;
+          break;
+        }
       } catch {
         /* try next */
       }
     }
     if (!submitted) {
-      return { status: "error", detail: "دکمه تأیید ورود پیدا نشد." };
+      // pressing Enter inside the password field submits on TikTok's form
+      try {
+        await page.locator('input[type="password"]').first().focus({ timeout: 2000 });
+        await page.keyboard.press("Enter");
+        submitted = true;
+      } catch {
+        return { status: "error", detail: "دکمه تأیید ورود پیدا نشد." };
+      }
     }
 
     // wait for an outcome (session cookie / captcha / error)
