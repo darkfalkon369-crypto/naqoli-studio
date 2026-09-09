@@ -52,6 +52,26 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-5">
+      {settings && (
+        <div
+          className={
+            settings.simulationMode
+              ? "animate-pop flex flex-wrap items-center gap-3 rounded-xl border border-sun-300/50 bg-sun-100 px-4 py-3"
+              : "animate-pop flex flex-wrap items-center gap-3 rounded-xl border border-leaf-600/30 bg-leaf-100 px-4 py-3"
+          }
+        >
+          <span className="text-xl">{settings.simulationMode ? "🎭" : "✅"}</span>
+          <p className="flex-1 text-xs font-bold leading-5 text-ink-800">
+            {settings.simulationMode
+              ? "حالت شبیه‌سازی روشن است — همه آمارها (بازدید، فالوور، انتشار) نمونه و ساختگی هستند و فقط برای دمو جریان کاری‌اند."
+              : "حالت واقعی فعال است — فقط داده‌های تأییدشده نمایش داده می‌شود و هیچ عدد ساختگی تولید نمی‌شود."}
+          </p>
+          <a href="/settings" className="rounded-lg bg-paper px-3 py-1.5 text-[11px] font-bold text-ink-700 shadow ring-1 ring-line hover:bg-cream">
+            تغییر حالت ←
+          </a>
+        </div>
+      )}
+
       {settings && !settings.onboardingDone && (
         <Onboarding
           settings={settings}

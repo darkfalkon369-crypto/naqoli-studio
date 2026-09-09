@@ -40,6 +40,7 @@ export default function QueuePage() {
   const { data: videos } = useFetch<Video[]>("/api/videos");
   const { data: accounts } = useFetch<Account[]>("/api/accounts");
   const { data: settings } = useFetch<BotSettings>("/api/settings");
+  const sim = settings?.simulationMode ?? false;
 
   const list = useMemo(() => {
     const all = videos ?? [];
@@ -183,6 +184,7 @@ export default function QueuePage() {
 
                   {v.status === "published" ? (
                     <div className="flex items-center gap-3 text-[11px] font-bold text-ink-700">
+                      {settings?.simulationMode && <Badge tone="sun">نمونه 🎭</Badge>}
                       <span className="inline-flex items-center gap-1">
                         <IconEye className="h-3.5 w-3.5 text-coral-500" /> {faCompact(v.views)}
                       </span>

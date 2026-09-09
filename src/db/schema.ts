@@ -49,6 +49,8 @@ export const accounts = pgTable("accounts", {
   tokenExpiresAt: timestamp("token_expires_at"),
   sessionCookie: text("session_cookie").notNull().default(""),
   avatar: text("avatar").notNull().default(""),
+  statsSource: text("stats_source").notNull().default("sim"),
+  statsUpdatedAt: timestamp("stats_updated_at"),
   connectedAt: timestamp("connected_at").notNull().defaultNow(),
 });
 
@@ -77,4 +79,5 @@ export const settings = pgTable("settings", {
   tiktokClientKey: text("tiktok_client_key").notNull().default(""),
   tiktokClientSecret: text("tiktok_client_secret").notNull().default(""),
   ayrshareKey: text("ayrshare_key").notNull().default(""),
+  simulationMode: boolean("simulation_mode").notNull().default(true),
 });

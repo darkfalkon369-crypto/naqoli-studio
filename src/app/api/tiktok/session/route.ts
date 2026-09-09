@@ -26,7 +26,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const profile = await validateSession(username, sessionCookie);
+    const { profile, reason } = await validateSession(username, sessionCookie);
     const finalUsername = profile?.username ?? username;
 
     const existing = await db
@@ -62,12 +62,13 @@ export async function POST(req: Request) {
       "info",
       profile
         ? `حساب @${finalUsername} با نشست وب متصل و اعتبارسنجی شد ✅`
-        : `حساب @${finalUsername} با نشست وب ذخیره شد (اعتبارسنجی از این سرور ممکن نشد — هنگام انتشار استفاده می‌شود)`
+        : `حساب @${finalUsername} با نشست وب ذخیره شد (نتیجه بررسی: ${reason})`
     );
 
     return NextResponse.json({
       ok: true,
       validated: Boolean(profile),
+      reason,
       account: {
         username: finalUsername,
         displayName: profile?.displayName ?? username,

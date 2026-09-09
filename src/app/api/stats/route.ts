@@ -27,6 +27,7 @@ function a(x: AccountRow): Account {
     accessToken: x.accessToken ? "••••••" : "",
     sessionCookie: x.sessionCookie ? "••••••" : "",
     tokenExpiresAt: x.tokenExpiresAt?.toISOString() ?? null,
+    statsUpdatedAt: x.statsUpdatedAt?.toISOString() ?? null,
     connectedAt: x.connectedAt.toISOString(),
   };
 }

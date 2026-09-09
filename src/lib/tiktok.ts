@@ -129,16 +129,33 @@ export interface TikTokProfile {
   avatar: string;
 }
 
+export type StatsReason =
+  | "ok"
+  | "not_found"
+  | "captcha"
+  | "blocked"
+  | "timeout"
+  | "network";
+
+export interface RealStats {
+  reason: StatsReason;
+  profile?: TikTokProfile & {
+    followerCount: number;
+    videoCount: number;
+    heartCount: number;
+  };
+}
+
 /**
- * Validate a web session cookie by asking TikTok for the user's profile.
- * Returns the profile when the session is valid; null when it is not
- * (or when TikTok blocks the check from this server — callers should
- * treat null as "not validated" rather than "definitely invalid").
+ * Fetch REAL profile data from TikTok's web API.
+ * Works anonymously for public profiles; a session cookie raises the
+ * chance of success. The `reason` explains failures precisely so the
+ * panel can show an honest, actionable message.
  */
-export async function validateSession(
+export async function fetchRealStats(
   username: string,
-  sessionCookie: string
-): Promise<TikTokProfile | null> {
+  sessionCookie?: string
+): Promise<RealStats> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 8000);
   try {
@@ -147,27 +164,63 @@ export async function validateSession(
       {
         signal: controller.signal,
         headers: {
-          cookie: `sessionid=${sessionCookie}`,
+          ...(sessionCookie ? { cookie: `sessionid=${sessionCookie}` } : {}),
           "user-agent":
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
           referer: "https://www.tiktok.com/",
         },
       }
     );
-    const body = await res.json().catch(() => ({}));
-    const u = body?.userInfo?.user;
-    if (!u || !u.id) return null;
-    return {
-      openId: String(u.id),
-      username: String(u.uniqueId ?? username),
-      displayName: String(u.nickname ?? username),
-      avatar: String(u.avatarThumb ?? ""),
+    const raw = await res.text();
+    let body: Record<string, unknown> = {};
+    try {
+      body = JSON.parse(raw);
+    } catch {
+      // TikTok answers some datacenter IPs with verification challenges
+      if (/captcha|verify|arecaptcha/i.test(raw)) return { reason: "captcha" };
+      return { reason: "blocked" };
+    }
+    const info = body as {
+      userInfo?: { user?: Record<string, unknown>; stats?: Record<string, number> };
+      statusCode?: number;
     };
-  } catch {
-    return null;
+    const u = info?.userInfo?.user;
+    if (!u || !u.id) {
+      const flat = JSON.stringify(body).toLowerCase();
+      if (flat.includes("captcha") || flat.includes("verify")) return { reason: "captcha" };
+      if (flat.includes("not found") || info?.statusCode === 10202) return { reason: "not_found" };
+      return { reason: "blocked" };
+    }
+    const stats = info?.userInfo?.stats ?? {};
+    return {
+      reason: "ok",
+      profile: {
+        openId: String(u.id),
+        username: String(u.uniqueId ?? username),
+        displayName: String(u.nickname ?? username),
+        avatar: String(u.avatarThumb ?? ""),
+        followerCount: Number(stats.followerCount ?? 0),
+        videoCount: Number(stats.videoCount ?? 0),
+        heartCount: Number(stats.heartCount ?? 0),
+      },
+    };
+  } catch (e) {
+    return {
+      reason: e instanceof Error && e.name === "AbortError" ? "timeout" : "network",
+    };
   } finally {
     clearTimeout(timer);
   }
+}
+
+/** Session login flow helper — validates and reports the exact reason. */
+export async function validateSession(
+  username: string,
+  sessionCookie: string
+): Promise<{ profile: TikTokProfile | null; reason: StatsReason }> {
+  const r = await fetchRealStats(username, sessionCookie);
+  if (r.reason === "ok" && r.profile) return { profile: r.profile, reason: "ok" };
+  return { profile: null, reason: r.reason };
 }
 
 export interface AyrshareResult {

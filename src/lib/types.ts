@@ -37,6 +37,8 @@ export interface Account {
   sessionCookie: string;
   tokenExpiresAt: string | null;
   avatar: string;
+  statsSource: string;
+  statsUpdatedAt: string | null;
   connectedAt: string;
 }
 
@@ -65,6 +67,7 @@ export interface BotSettings {
   tiktokClientKey: string;
   tiktokClientSecret: string;
   ayrshareKey: string;
+  simulationMode: boolean;
 }
 
 export interface Stats {

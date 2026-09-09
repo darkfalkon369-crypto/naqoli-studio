@@ -13,8 +13,17 @@ import {
 } from "@/components/icons";
 import { Badge, Btn, Card, CardHead, Toggle, cn } from "@/components/ui";
 import { api, bump, toast, useFetch } from "@/lib/api";
-import { faCompact, faDate, faNum } from "@/lib/format";
+import { faCompact, faDate, faNum, relTime } from "@/lib/format";
 import type { Account, BotSettings } from "@/lib/types";
+
+const REASON_FA: Record<string, string> = {
+  ok: "آمار واقعی دریافت شد",
+  not_found: "این نام کاربری در تیک‌تاک پیدا نشد",
+  captcha: "تیک‌تاک از آی‌پی این سرور کپچا خواست — آمار واقعی از این سرور ممکن نیست",
+  blocked: "تیک‌تاک این سرور را مسدود کرد — آمار واقعی از این آی‌پی ممکن نیست",
+  timeout: "تیک‌تاک پاسخ نداد؛ دوباره تلاش کنید",
+  network: "خطای شبکه در ارتباط با تیک‌تاک",
+};
 
 export default function AccountsPage() {
   const { data: accounts } = useFetch<Account[]>("/api/accounts");
@@ -50,12 +59,27 @@ export default function AccountsPage() {
 
   async function sync(a: Account) {
     setSyncing(a.id);
-    await new Promise((r) => setTimeout(r, 900));
-    const res = await api<Account & { gain: number }>("/api/accounts/sync", {
-      method: "POST",
-      body: JSON.stringify({ id: a.id }),
-    });
-    toast(`🔄 همگام‌سازی شد؛ ${faNum(res.gain)} دنبال‌کننده جدید!`);
+    try {
+      const res = await api<{
+        mode: "real" | "sim";
+        ok: boolean;
+        reason?: string;
+        gain?: number;
+        followers?: number;
+      }>("/api/accounts/sync", {
+        method: "POST",
+        body: JSON.stringify({ id: a.id }),
+      });
+      if (res.mode === "real" && res.ok) {
+        toast(`📊 آمار واقعی @${a.username} از تیک‌تاک دریافت شد: ${faNum(res.followers ?? 0)} دنبال‌کننده`);
+      } else if (res.mode === "real") {
+        toast(REASON_FA[res.reason ?? "blocked"]);
+      } else {
+        toast(`🎭 حالت شبیه‌سازی: +${faNum(res.gain ?? 0)} دنبال‌کننده نمونه`);
+      }
+    } catch {
+      toast("خطا در همگام‌سازی");
+    }
     setSyncing(null);
     bump();
   }
@@ -231,6 +255,17 @@ export default function AccountsPage() {
               <div className="px-3 py-4">
                 <p className="font-display text-xl">{faCompact(a.followers)}</p>
                 <p className="mt-0.5 text-[10px] text-ink-500">دنبال‌کننده</p>
+                <p
+                  className={
+                    a.statsSource === "real"
+                      ? "mt-1 text-[9px] font-bold text-leaf-600"
+                      : "mt-1 text-[9px] font-bold text-sun-600"
+                  }
+                >
+                  {a.statsSource === "real"
+                    ? `واقعی ✓${a.statsUpdatedAt ? ` — ${relTime(a.statsUpdatedAt)}` : ""}`
+                    : "نمونه 🎭"}
+                </p>
               </div>
               <div className="px-3 py-4">
                 <p className="font-display text-xl">{faNum(a.videosCount)}</p>
@@ -448,7 +483,11 @@ function SessionCard() {
   const [username, setUsername] = useState("");
   const [session, setSession] = useState("");
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<{ validated: boolean; username: string } | null>(null);
+  const [result, setResult] = useState<{
+    validated: boolean;
+    username: string;
+    reason?: string;
+  } | null>(null);
   const [error, setError] = useState("");
 
   async function connect() {
@@ -460,15 +499,27 @@ function SessionCard() {
     }
     setBusy(true);
     try {
-      const r = await api<{ ok: true; validated: boolean; account: { username: string } }>(
-        "/api/tiktok/session",
-        {
-          method: "POST",
-          body: JSON.stringify({ action: "connect", username, sessionCookie: session }),
-        }
-      );
-      setResult({ validated: r.validated, username: r.account.username });
-      toast(r.validated ? "✅ نشست تأیید و حساب متصل شد" : "حساب ذخیره شد — تأیید هنگام انتشار انجام می‌شود");
+      const r = await api<{
+        ok: true;
+        validated: boolean;
+        reason?: string;
+        account: { username: string };
+      }>("/api/tiktok/session", {
+        method: "POST",
+        body: JSON.stringify({ action: "connect", username, sessionCookie: session }),
+      });
+      setResult({
+        validated: r.validated,
+        username: r.account.username,
+        reason: r.reason,
+      });
+      if (r.validated) {
+        toast("✅ نشست تأیید شد — حساب با آمار واقعی متصل است");
+      } else if (r.reason === "not_found") {
+        toast("نام کاربری پیدا نشد؛ آن را دقیق بررسی کنید");
+      } else {
+        toast("حساب ذخیره شد — تیک‌تاک اجازه بررسی از این سرور را نداد");
+      }
       bump();
     } catch (e) {
       setError(e instanceof Error ? e.message : "خطا در اتصال");
@@ -511,10 +562,18 @@ function SessionCard() {
             <p className="rounded-lg bg-[#fde3e1] px-3 py-2 text-xs font-bold text-ruby-500">{error}</p>
           )}
           {result && (
-            <p className="rounded-lg border border-teal-100 bg-teal-50 px-3 py-2 text-xs font-bold text-teal-700">
+            <p
+              className={
+                result.validated
+                  ? "rounded-lg border border-teal-100 bg-teal-50 px-3 py-2 text-xs font-bold leading-5 text-teal-700"
+                  : "rounded-lg border border-sun-300/50 bg-sun-100 px-3 py-2 text-xs font-bold leading-5 text-ink-800"
+              }
+            >
               {result.validated
-                ? `✅ نشست @${result.username} تأیید شد و اتصال برقرار است`
-                : `حساب @${result.username} ذخیره شد؛ اعتبارسنجی از این سرور ممکن نشد ولی نشست برای انتشار نگه داشته شد`}
+                ? `✅ نشست @${result.username} تأیید شد — اتصال برقرار است و آمار واقعی قابل دریافت است`
+                : `⚠️ حساب @${result.username} ذخیره شد ولی تیک‌تاک اجازه تأیید از این سرور را نداد (${
+                    REASON_FA[result.reason ?? ""] ?? REASON_FA.blocked
+                  }). این محدودیت آی‌پی سرور است، نه مشکل نشست شما.`}
             </p>
           )}
           <Btn variant="dark" onClick={connect} disabled={busy} className="w-full py-3">

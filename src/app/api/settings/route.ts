@@ -25,6 +25,7 @@ export async function PATCH(req: Request) {
     "tiktokClientKey",
     "tiktokClientSecret",
     "ayrshareKey",
+    "simulationMode",
   ] as const;
   const patch: Record<string, unknown> = {};
   for (const k of allowed) {

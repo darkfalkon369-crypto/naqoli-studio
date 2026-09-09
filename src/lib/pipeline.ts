@@ -80,6 +80,7 @@ export async function createVideo(input: GenerateInput, origin = "engine") {
 export async function publishVideo(id: number, boosted = false) {
   const [v] = await db.select().from(videos).where(eq(videos.id, id)).limit(1);
   if (!v) return null;
+  const st = await getSettings();
   let accId = v.accountId;
   if (!accId) {
     const accs = await db
@@ -89,10 +90,13 @@ export async function publishVideo(id: number, boosted = false) {
       .orderBy(asc(accounts.videosCount));
     accId = accs[0]?.id ?? null;
   }
-  const views = boosted ? randInt(1500, 16000) : randInt(800, 9000);
-  const likes = Math.round(views * (0.07 + Math.random() * 0.05));
-  const shares = Math.round(views * (0.015 + Math.random() * 0.02));
-  const comments = Math.round(views * (0.004 + Math.random() * 0.006));
+
+  // Real mode: never fabricate engagement numbers.
+  const simulate = st.simulationMode;
+  const views = simulate ? (boosted ? randInt(1500, 16000) : randInt(800, 9000)) : 0;
+  const likes = simulate ? Math.round(views * (0.07 + Math.random() * 0.05)) : 0;
+  const shares = simulate ? Math.round(views * (0.015 + Math.random() * 0.02)) : 0;
+  const comments = simulate ? Math.round(views * (0.004 + Math.random() * 0.006)) : 0;
   const [pub] = await db
     .update(videos)
     .set({
@@ -109,12 +113,14 @@ export async function publishVideo(id: number, boosted = false) {
     .where(eq(videos.id, id))
     .returning();
 
-  if (accId) {
+  if (accId && simulate) {
+    // demo numbers only — real mode never fabricates growth
     await db
       .update(accounts)
       .set({
         followers: sql`${accounts.followers} + ${Math.round(views * 0.03)}`,
         videosCount: sql`${accounts.videosCount} + 1`,
+        statsSource: "sim",
       })
       .where(eq(accounts.id, accId));
   }
@@ -124,7 +130,6 @@ export async function publishVideo(id: number, boosted = false) {
 
   // Real posting via the Ayrshare relay — only when both an API key and an
   // actual video file are attached. Otherwise the pipeline stays in demo mode.
-  const st = await getSettings();
   if (st.ayrshareKey && pub.fileUrl) {
     const { postViaAyrshare } = await import("./tiktok");
     const result = await postViaAyrshare(st.ayrshareKey, {
@@ -234,7 +239,9 @@ export async function tickPipeline(): Promise<TickSummary> {
     }
   }
 
-  // 3) publish due scheduled videos
+  // 3) publish due scheduled videos.
+  // In REAL mode without a real channel (Ayrshare key), videos simply stay
+  // scheduled — we never pretend they were posted.
   const due = await db
     .select()
     .from(videos)
@@ -242,7 +249,9 @@ export async function tickPipeline(): Promise<TickSummary> {
       and(eq(videos.status, "scheduled"), lte(videos.scheduledAt, new Date()))
     )
     .orderBy(asc(videos.scheduledAt));
+  const hasRealChannel = Boolean(s.ayrshareKey);
   for (const v of due) {
+    if (!s.simulationMode && !hasRealChannel) continue;
     await publishVideo(v.id);
     summary.published++;
   }

@@ -37,6 +37,7 @@ export default function SettingsPage() {
           autoPublish: s.autoPublish,
           safeMode: s.safeMode,
           watermark: s.watermark,
+          simulationMode: s.simulationMode,
           dailyLimit: s.dailyLimit,
           voiceStyle: s.voiceStyle,
           hashtags: s.hashtags,
@@ -60,6 +61,13 @@ export default function SettingsPage() {
           sub="رفتار مستقل ربات را کنترل کنید"
         />
         <div className="divide-y divide-line">
+          <SettingRow
+            title="حالت شبیه‌سازی (داده نمونه)"
+            desc="روشن: آمار و بازدیدهای نمونه ساخته می‌شود — خاموش: فقط داده واقعی تیک‌تاک، بدون هیچ عدد ساختگی"
+            checked={s.simulationMode}
+            onChange={(v) => patch({ simulationMode: v })}
+            icon={<span className="text-base">🎭</span>}
+          />
           <SettingRow
             title="تولید خودکار ویدئو"
             desc="ربات طبق سقف روزانه، خودش ایده می‌سازد و تولید می‌کند"
