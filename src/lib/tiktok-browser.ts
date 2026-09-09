@@ -57,33 +57,67 @@ export async function loginWithPassword(
     const page = await context.newPage();
     page.setDefaultTimeout(12000);
 
-    await page.goto("https://www.tiktok.com/", {
+    const diagnose = async (): Promise<string> => {
+      const title = await page.title().catch(() => "");
+      const text = await page
+        .evaluate(() => (document.body?.innerText ?? "").slice(0, 160))
+        .catch(() => "");
+      return `${title} | ${text.replace(/\s+/g, " ").trim()}`;
+    };
+
+    // go straight to the login page first
+    await page.goto("https://www.tiktok.com/login", {
       waitUntil: "domcontentloaded",
       timeout: 25000,
     });
-    await page.waitForTimeout(2500);
+    await page.waitForTimeout(3000);
 
-    // open the login modal
-    const openSelectors = [
-      '[data-e2e="top-login-button"]',
-      'button:has-text("Log in")',
-      'button:has-text("Log In")',
-      '[data-e2e="nav-login"]',
-    ];
-    let opened = false;
-    for (const sel of openSelectors) {
-      try {
-        await page.click(sel, { timeout: 4000 });
-        opened = true;
-        break;
-      } catch {
-        /* try next */
+    let formVisible = await page
+      .locator('input[type="password"], [data-e2e="login-password"]')
+      .first()
+      .isVisible({ timeout: 4000 })
+      .catch(() => false);
+
+    if (!formVisible) {
+      // verification wall or SPA not ready — try the home page modal
+      const wall = await diagnose();
+      await page.goto("https://www.tiktok.com/", {
+        waitUntil: "domcontentloaded",
+        timeout: 25000,
+      });
+      await page.waitForTimeout(3000);
+      const openSelectors = [
+        '[data-e2e="top-login-button"]',
+        'button:has-text("Log in")',
+        'button:has-text("Log In")',
+        '[data-e2e="nav-login"]',
+      ];
+      let opened = false;
+      for (const sel of openSelectors) {
+        try {
+          await page.click(sel, { timeout: 4000 });
+          opened = true;
+          break;
+        } catch {
+          /* try next */
+        }
+      }
+      await page.waitForTimeout(2500);
+      formVisible = await page
+        .locator('input[type="password"], [data-e2e="login-password"]')
+        .first()
+        .isVisible({ timeout: 4000 })
+        .catch(() => false);
+      if (!opened && !formVisible) {
+        if (/verify|verification|captcha|drag/i.test(wall)) {
+          return {
+            status: "captcha",
+            detail: `تیک‌تاک از آی‌پی سرور دیوار تأیید نشان داد: ${wall}`,
+          };
+        }
+        return { status: "error", detail: `فرم ورود پیدا نشد. وضعیت صفحه: ${wall}` };
       }
     }
-    if (!opened) {
-      return { status: "error", detail: "دکمه ورود در صفحه پیدا نشد (احتمالاً صفحه تأیید/کپچا)." };
-    }
-    await page.waitForTimeout(2000);
 
     // switch to username login if a dedicated tab/link exists
     const switchSelectors = [
