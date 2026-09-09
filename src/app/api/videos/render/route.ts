@@ -8,7 +8,8 @@ import { addLog } from "@/lib/pipeline";
 import { renderVideoFile } from "@/lib/render-video";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 180;
+// a 60s recording + encode can take a few minutes
+export const maxDuration = 300;
 
 /**
  * Render the final MP4 for a video and (re)generate its caption.

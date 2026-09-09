@@ -1,3 +1,8 @@
+export interface SeqItem {
+  label: string;
+  color?: string;
+}
+
 export interface Category {
   key: string;
   emoji: string;
@@ -6,6 +11,14 @@ export interface Category {
   bar: string;
   titles: string[];
   scene: { from: string; to: string; deco: string[] };
+  /** topic-relevant flashcards shown during the video's teaching act */
+  seq: SeqItem[];
+}
+
+/** extract the subject emoji from a title (e.g. trailing 🚂), else category emoji */
+export function subjectEmoji(title: string, cat: Category): string {
+  const m = title.match(/([\u{1F300}-\u{1FAFF}\u{2190}-\u{27BF}\u{FE0F}])\s*$/u);
+  return m?.[1] ?? cat.emoji;
 }
 
 export const CATEGORIES: Category[] = [
@@ -22,6 +35,7 @@ export const CATEGORIES: Category[] = [
       "خرگوش بازیگوش هویج‌ها را می‌شمارد",
     ],
     scene: { from: "#ffe7cf", to: "#ffb98a", deco: ["🦁", "🐰", "🐘", "🦒", "🌼"] },
+    seq: [{ label: "🦁" }, { label: "🐰" }, { label: "🐘" }, { label: "🦒" }, { label: "🐼" }, { label: "🐤" }],
   },
   {
     key: "اعداد",
@@ -36,6 +50,7 @@ export const CATEGORIES: Category[] = [
       "بیست انگشت، بیست عدد شیرین",
     ],
     scene: { from: "#fff3cf", to: "#ffd97a", deco: ["🌟", "1️⃣", "2️⃣", "3️⃣", "🎈"] },
+    seq: [{ label: "۱" }, { label: "۲" }, { label: "۳" }, { label: "۴" }, { label: "۵" }, { label: "۶" }, { label: "۷" }],
   },
   {
     key: "رنگ‌ها",
@@ -50,6 +65,7 @@ export const CATEGORIES: Category[] = [
       "توپ‌های رنگی را جور کن!",
     ],
     scene: { from: "#ddf3ee", to: "#8fd8c8", deco: ["🌈", "🎨", "🖍️", "🎈", "☁️"] },
+    seq: [{ label: "قرمز", color: "#e5484d" }, { label: "آبی", color: "#2e86c9" }, { label: "زرد", color: "#f2a81d" }, { label: "سبز", color: "#3e9b4f" }, { label: "بنفش", color: "#8a5cc0" }],
   },
   {
     key: "سیارات",
@@ -64,6 +80,7 @@ export const CATEGORIES: Category[] = [
       "منظومه شمسی برای کوچولوها",
     ],
     scene: { from: "#e9e4f8", to: "#b9a6ec", deco: ["🚀", "🪐", "🌙", "⭐", "👩‍🚀"] },
+    seq: [{ label: "🚀" }, { label: "🪐" }, { label: "🌙" }, { label: "⭐" }, { label: "☄️" }],
   },
   {
     key: "وسایل نقلیه",
@@ -78,6 +95,7 @@ export const CATEGORIES: Category[] = [
       "هواپیماهای کاغذی در آسمان ✈️",
     ],
     scene: { from: "#ffe1de", to: "#ffa8a0", deco: ["🚒", "🚂", "🚗", "✈️", "🚁"] },
+    seq: [{ label: "🚒" }, { label: "🚂" }, { label: "🚗" }, { label: "✈️" }, { label: "🚲" }],
   },
   {
     key: "الفبا",
@@ -92,6 +110,7 @@ export const CATEGORIES: Category[] = [
       "بلوک‌های حروف را بچین و بخوان",
     ],
     scene: { from: "#dcecf8", to: "#9cc8ec", deco: ["🧩", "📚", "✏️", "🦉", "🔤"] },
+    seq: [{ label: "آ" }, { label: "ب" }, { label: "پ" }, { label: "ت" }, { label: "ج" }, { label: "چ" }],
   },
 ];
 
