@@ -20,6 +20,9 @@ export interface Video {
   shares: number;
   comments: number;
   hashtags: string;
+  fileUrl: string;
+  caption: string;
+  renderStatus: string;
   thumbnail: string;
   voiceStyle: string;
   createdAt: string;

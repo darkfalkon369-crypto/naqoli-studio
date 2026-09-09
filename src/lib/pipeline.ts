@@ -2,6 +2,7 @@ import { and, asc, desc, eq, gte, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { accounts, botLogs, settings, videos } from "@/db/schema";
 import { CATEGORIES, STAGES, categoryOf } from "./catalog";
+import { buildCaption } from "./caption";
 
 // ---------- helpers ----------
 
@@ -54,6 +55,7 @@ export async function createVideo(input: GenerateInput, origin = "engine") {
   const s = await getSettings();
   const cat = categoryOf(input.category ?? pick(CATEGORIES).key);
   const title = input.title?.trim() || pick(cat.titles);
+  const caption = buildCaption(cat, title, s.hashtags);
   const [row] = await db
     .insert(videos)
     .values({
@@ -65,6 +67,7 @@ export async function createVideo(input: GenerateInput, origin = "engine") {
       voiceStyle: input.voiceStyle ?? s.voiceStyle,
       hashtags: s.hashtags,
       thumbnail: cat.thumb,
+      caption,
     })
     .returning();
   await addLog(

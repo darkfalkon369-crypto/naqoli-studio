@@ -30,6 +30,8 @@ export const videos = pgTable("videos", {
   comments: integer("comments").notNull().default(0),
   hashtags: text("hashtags").notNull().default(""),
   fileUrl: text("file_url").notNull().default(""),
+  caption: text("caption").notNull().default(""),
+  renderStatus: text("render_status").notNull().default("idle"),
   thumbnail: text("thumbnail").notNull().default(""),
   voiceStyle: text("voice_style").notNull().default("شاد و کودکانه"),
   safeChecked: boolean("safe_checked").notNull().default(true),

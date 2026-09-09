@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import {
   IconCalendar,
   IconCheck,
+  IconCopy,
+  IconDownload,
   IconEye,
   IconHeart,
   IconShare,
@@ -37,6 +39,7 @@ const TABS = [
 
 export default function QueuePage() {
   const [tab, setTab] = useState("all");
+  const [expanded, setExpanded] = useState<number | null>(null);
   const { data: videos } = useFetch<Video[]>("/api/videos");
   const { data: accounts } = useFetch<Account[]>("/api/accounts");
   const { data: settings } = useFetch<BotSettings>("/api/settings");
@@ -75,6 +78,18 @@ export default function QueuePage() {
   async function remove(v: Video) {
     await api(`/api/videos?id=${v.id}`, { method: "DELETE" });
     toast("ویدئو حذف شد");
+    bump();
+  }
+
+  function startRender(v: Video) {
+    toast("🎬 رندر ویدیو شروع شد — حدود یک دقیقه طول می‌کشد");
+    api("/api/videos/render", {
+      method: "POST",
+      body: JSON.stringify({ id: v.id }),
+    }).catch((e) => {
+      toast(e instanceof Error ? e.message : "خطا در رندر ویدیو");
+      bump();
+    });
     bump();
   }
 
@@ -156,7 +171,8 @@ export default function QueuePage() {
             {list.map((v) => {
               const cat = categoryOf(v.category);
               return (
-                <div key={v.id} className="flex flex-wrap items-center gap-3 px-5 py-3.5 sm:flex-nowrap">
+                <div key={v.id}>
+                <div className="flex flex-wrap items-center gap-3 px-5 py-3.5 sm:flex-nowrap">
                   <div className="relative shrink-0">
                     <img
                       src={v.thumbnail}
@@ -200,6 +216,18 @@ export default function QueuePage() {
                   )}
 
                   <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => setExpanded(expanded === v.id ? null : v.id)}
+                      title="خروجی ویدیو و کپشن"
+                      className={cn(
+                        "grid h-8 w-8 place-items-center rounded-lg transition-colors",
+                        expanded === v.id
+                          ? "bg-coral-500 text-white"
+                          : "bg-coral-100 text-coral-600 hover:bg-coral-500 hover:text-white"
+                      )}
+                    >
+                      <IconDownload className="h-4 w-4" />
+                    </button>
                     {(v.status === "queued" || v.status === "scheduled" || v.status === "generating") && (
                       <button
                         onClick={() => publishNow(v)}
@@ -218,11 +246,104 @@ export default function QueuePage() {
                     </button>
                   </div>
                 </div>
+                {expanded === v.id && (
+                  <OutputPanel v={v} onRender={() => startRender(v)} />
+                )}
+                </div>
               );
             })}
           </div>
         )}
       </Card>
+    </div>
+  );
+}
+
+// ═══════════════ Video output panel (render, download, caption) ═══════════════
+
+function OutputPanel({ v, onRender }: { v: Video; onRender: () => void }) {
+  const ready = Boolean(v.fileUrl) && v.renderStatus !== "rendering";
+  const rendering = v.renderStatus === "rendering";
+
+  async function copyCaption() {
+    try {
+      await navigator.clipboard.writeText(v.caption || "");
+      toast("کپشن کپی شد — در تیک‌تاک جای‌گذاری کنید 📋");
+    } catch {
+      toast("کپی ناموفق بود");
+    }
+  }
+
+  return (
+    <div className="animate-pop grid gap-4 border-t border-dashed border-line bg-cream/60 px-5 py-4 lg:grid-cols-[240px_1fr]">
+      {/* video side */}
+      <div className="space-y-2.5">
+        <div className="relative overflow-hidden rounded-xl bg-ink-900 ring-1 ring-line">
+          {ready ? (
+            <video src={v.fileUrl} controls playsInline className="aspect-[9/16] w-full object-cover" />
+          ) : (
+            <>
+              <img src={v.thumbnail} alt="" className="aspect-[9/16] w-full object-cover opacity-70" />
+              {rendering && (
+                <div className="absolute inset-0 grid place-items-center bg-ink-900/60">
+                  <div className="text-center">
+                    <span className="mx-auto block h-8 w-8 animate-spin rounded-full border-2 border-cream border-t-coral-500" />
+                    <p className="mt-2 text-[10px] font-bold text-cream">در حال ساخت فایل ویدیو…</p>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+        {ready ? (
+          <a
+            href={v.fileUrl}
+            download={`naqoli-${v.id}.mp4`}
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-teal-500 px-4 py-2.5 text-xs font-bold text-white shadow-[0_4px_0_0_var(--color-teal-700)] transition-all hover:bg-teal-600 active:translate-y-0.5 active:shadow-none"
+          >
+            <IconDownload className="h-4 w-4" />
+            دانلود فایل ویدیو (MP4)
+          </a>
+        ) : (
+          <button
+            onClick={onRender}
+            disabled={rendering}
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-coral-500 px-4 py-2.5 text-xs font-bold text-white shadow-[0_4px_0_0_var(--color-coral-700)] transition-all hover:bg-coral-600 active:translate-y-0.5 active:shadow-none disabled:pointer-events-none disabled:opacity-60"
+          >
+            {rendering ? "در حال رندر… (حدود ۱ دقیقه)" : "🎞️ ساخت فایل ویدیو برای دانلود"}
+          </button>
+        )}
+        <p className="text-center text-[9px] leading-4 text-ink-300">
+          خروجی عمودی ۱۰۸۰×۱۹۲۰ — آماده آپلود دستی در تیک‌تاک
+        </p>
+      </div>
+
+      {/* caption side */}
+      <div className="flex flex-col">
+        <div className="mb-2 flex items-center justify-between">
+          <p className="text-xs font-bold text-ink-700">📝 کپشن آماده انتشار</p>
+          <button
+            onClick={copyCaption}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-ink-900 px-3 py-1.5 text-[10px] font-bold text-cream transition-colors hover:bg-ink-700"
+          >
+            <IconCopy className="h-3 w-3" />
+            کپی کپشن
+          </button>
+        </div>
+        <div className="flex-1 rounded-xl border-2 border-dashed border-line bg-paper p-4">
+          {v.caption ? (
+            <p className="whitespace-pre-line text-xs leading-7 text-ink-800">{v.caption}</p>
+          ) : (
+            <p className="text-xs text-ink-300">
+              کپشن ندارد — با زدن «ساخت فایل ویدیو» خودکار ساخته می‌شود.
+            </p>
+          )}
+        </div>
+        <p className="mt-2 text-[10px] leading-5 text-ink-500">
+          ۱. ویدیو را دانلود کنید ← ۲. در اپ تیک‌تاک «+» را بزنید و آپلود کنید ← ۳. این کپشن را
+          در فیلد توضیحات جای‌گذاری کنید.
+        </p>
+      </div>
     </div>
   );
 }
