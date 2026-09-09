@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import {
+  IconBot,
   IconCheck,
   IconFilm,
   IconKey,
@@ -159,6 +160,7 @@ export default function AccountsPage() {
       </Card>
 
       <TikTokQrCard />
+      <PasswordLoginCard />
       <SessionCard />
       <AyrshareCard />
 
@@ -242,6 +244,8 @@ export default function AccountsPage() {
                 </Badge>
               ) : a.loginMethod === "session" ? (
                 <Badge tone="sun">اتصال با نشست</Badge>
+              ) : a.loginMethod === "password" ? (
+                <Badge tone="berry">اتصال با رمز</Badge>
               ) : (
                 <Badge tone="ink">اتصال دستی</Badge>
               )}
@@ -656,6 +660,120 @@ function AyrshareCard() {
           📌 برای انتشار واقعی، هر ویدئو باید یک فایل واقعی (لینک mp4) داشته باشد؛ کلید که ذخیره
           شود، موتور انتشار به‌صورت خودکار از «حالت دمو» به «آپلود واقعی» تغییر می‌کند.
         </p>
+      </div>
+    </Card>
+  );
+}
+
+// ═══════════════ Direct username/password login (last resort) ═══════════════
+
+function PasswordLoginCard() {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [error, setError] = useState("");
+
+  async function login() {
+    setError("");
+    setResult(null);
+    if (!username.trim() || !password) {
+      setError("نام کاربری و رمز عبور را وارد کنید");
+      return;
+    }
+    setBusy(true);
+    try {
+      const r = await api<{ ok: boolean; message: string; status: string }>(
+        "/api/tiktok/login-password",
+        {
+          method: "POST",
+          body: JSON.stringify({ username, password: password.trim() }),
+        }
+      );
+      setResult({ ok: r.ok, message: r.message });
+      if (r.ok) {
+        setPassword("");
+        toast("✅ ورود موفق — نشست حساب ذخیره شد");
+        bump();
+      } else {
+        toast("ورود ناموفق بود — جزئیات در کارت نمایش داده شد");
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "خطا در ارتباط با سرور");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card className="animate-pop overflow-hidden border-ruby-500/30">
+      <CardHead
+        icon={<IconBot className="h-5 w-5" />}
+        title="ورود مستقیم با یوزرنیم و رمز عبور"
+        sub="مرورگر خودکار، صفحه واقعی ورود تیک‌تاک را اجرا می‌کند"
+        extra={<Badge tone="ruby">آخرین راهحل</Badge>}
+      />
+      <div className="grid gap-5 p-5 lg:grid-cols-2">
+        <div className="space-y-3">
+          <div className="rounded-lg border border-ruby-500/30 bg-[#fde3e1] p-3 text-[11px] leading-5 text-ruby-500">
+            ⛔ <b>هشدار صادقانه:</b> این روش خلاف قوانین تیک‌تاک است و ممکن است حساب شما موقتاً
+            محدود یا مسدود شود. فقط با حساب خودتان و با پذیرش این ریسک استفاده کنید. رمز عبور
+            شما <b>هرگز ذخیره نمی‌شود</b>؛ فقط نشستِ حاصل نگهداری می‌شود.
+          </div>
+          <div>
+            <p className="mb-1.5 text-xs font-bold text-ink-700">نام کاربری</p>
+            <input
+              dir="ltr"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="my_kids_channel"
+              autoComplete="off"
+              className="w-full rounded-xl border border-line bg-cream px-4 py-2.5 text-sm outline-none focus:border-berry-500 focus:bg-paper"
+            />
+          </div>
+          <div>
+            <p className="mb-1.5 text-xs font-bold text-ink-700">رمز عبور</p>
+            <input
+              dir="ltr"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              autoComplete="new-password"
+              className="w-full rounded-xl border border-line bg-cream px-4 py-2.5 text-sm outline-none focus:border-berry-500 focus:bg-paper"
+            />
+          </div>
+          {error && (
+            <p className="rounded-lg bg-[#fde3e1] px-3 py-2 text-xs font-bold text-ruby-500">{error}</p>
+          )}
+          {result && (
+            <p
+              className={
+                result.ok
+                  ? "rounded-lg border border-teal-100 bg-teal-50 px-3 py-2 text-xs font-bold leading-5 text-teal-700"
+                  : "rounded-lg border border-sun-300/50 bg-sun-100 px-3 py-2 text-xs font-bold leading-5 text-ink-800"
+              }
+            >
+              {result.ok ? `✅ ${result.message}` : `⚠️ ${result.message}`}
+            </p>
+          )}
+          <Btn variant="dark" onClick={login} disabled={busy} className="w-full py-3">
+            {busy ? "در حال اجرای ورود خودکار… (تا ۴۰ ثانیه)" : "🔑 ورود و دریافت نشست"}
+          </Btn>
+        </div>
+        <div className="rounded-xl border border-line bg-cream/60 p-4">
+          <p className="text-xs font-bold text-ink-700">🤖 پشت صحنه چه اتفاقی می‌افتد؟</p>
+          <ol className="mt-2 space-y-1.5 text-[11px] leading-5 text-ink-500">
+            <li>۱. یک مرورگر کروم بدون رابط روی سرور باز می‌شود</li>
+            <li>۲. صفحه واقعی ورود تیک‌تاک بارگذاری و اطلاعات وارد می‌شود</li>
+            <li>۳. اگر ورود موفق باشد، کوکی نشست (sessionid) گرفته می‌شود</li>
+            <li>۴. حساب با نشان «اتصال با رمز» ذخیره و آمار واقعی‌اش گرفته می‌شود</li>
+          </ol>
+          <p className="mt-3 rounded-lg bg-paper p-2 text-[10px] leading-4 text-ink-500">
+            💡 نتایج رایج از آی‌پی دیتاسنتر: کپچا یا محدودیت. اگر پیام کپچا گرفتید، یعنی
+            تیک‌تاک به این سرور اعتماد ندارد و باید از روش نشست (F12) یا سرویس واسط استفاده کنید.
+          </p>
+        </div>
       </div>
     </Card>
   );
