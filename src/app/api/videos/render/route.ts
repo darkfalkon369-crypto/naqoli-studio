@@ -34,7 +34,9 @@ export async function POST(req: Request) {
 
   await db.update(videos).set({ renderStatus: "rendering" }).where(eq(videos.id, id));
   try {
-    const fileUrl = await renderVideoFile(v);
+    await renderVideoFile(v);
+    // served through the API so it survives Next.js production builds
+    const fileUrl = `/api/videos/file/${id}`;
     await db
       .update(videos)
       .set({ renderStatus: "ready", fileUrl, caption })
