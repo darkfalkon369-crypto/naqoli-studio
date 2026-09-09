@@ -18,6 +18,7 @@ import {
   Btn,
   Card,
   CardHead,
+  Cover,
   Empty,
   STATUS_META,
   StatusBadge,
@@ -173,15 +174,8 @@ export default function QueuePage() {
               return (
                 <div key={v.id}>
                 <div className="flex flex-wrap items-center gap-3 px-5 py-3.5 sm:flex-nowrap">
-                  <div className="relative shrink-0">
-                    <img
-                      src={v.thumbnail}
-                      alt=""
-                      className="h-16 w-11 rounded-lg object-cover ring-1 ring-line"
-                    />
-                    <span className="absolute -bottom-1.5 -start-1.5 grid h-6 w-6 place-items-center rounded-full bg-paper text-sm shadow ring-1 ring-line">
-                      {cat.emoji}
-                    </span>
+                  <div className="shrink-0">
+                    <Cover catKey={v.category} className="h-16 w-11 rounded-lg ring-1 ring-line" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-bold">{v.title}</p>
@@ -283,7 +277,7 @@ function OutputPanel({ v, onRender }: { v: Video; onRender: () => void }) {
             <video src={v.fileUrl} controls playsInline className="aspect-[9/16] w-full object-cover" />
           ) : (
             <>
-              <img src={v.thumbnail} alt="" className="aspect-[9/16] w-full object-cover opacity-70" />
+              <Cover catKey={v.category} className="aspect-[9/16] w-full" emojiClass="text-6xl" />
               {rendering && (
                 <div className="absolute inset-0 grid place-items-center bg-ink-900/60">
                   <div className="text-center">

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { categoryOf } from "@/lib/catalog";
 
 export function cn(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");
@@ -235,6 +236,42 @@ export function Progress({
         className={cn("h-full rounded-full transition-all duration-700", tone, striped && "progress-stripes")}
         style={{ width: `${Math.min(100, Math.max(0, value))}%` }}
       />
+    </div>
+  );
+}
+
+/**
+ * Deterministic, code-drawn cover for a category (no photo assets).
+ * Always kid-friendly and on-brand.
+ */
+export function Cover({
+  catKey,
+  className,
+  emojiClass = "text-2xl",
+}: {
+  catKey: string;
+  className?: string;
+  emojiClass?: string;
+}) {
+  const cat = categoryOf(catKey);
+  return (
+    <div
+      className={cn("relative grid place-items-center overflow-hidden", className)}
+      style={{
+        background: `linear-gradient(165deg, ${cat.scene.from}, ${cat.scene.to})`,
+      }}
+    >
+      <span
+        className="absolute -top-2 -start-2 h-6 w-6 rounded-full"
+        style={{ background: "rgba(255,255,255,.8)" }}
+      />
+      <span
+        className="absolute bottom-1 end-1 h-3 w-3 rounded-full"
+        style={{ background: `${cat.bar}66` }}
+      />
+      <span className={emojiClass} style={{ filter: "drop-shadow(0 2px 2px rgba(0,0,0,.2))" }}>
+        {cat.emoji}
+      </span>
     </div>
   );
 }

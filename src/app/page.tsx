@@ -14,10 +14,10 @@ import {
   IconWand,
   IconZap,
 } from "@/components/icons";
-import { Badge, Card, CardHead, Empty, Progress, STATUS_META, StatusBadge, cn } from "@/components/ui";
+import { Badge, Card, CardHead, Cover, Empty, Progress, StatusBadge, cn } from "@/components/ui";
 import { api, toast, useFetch } from "@/lib/api";
 import { CATEGORIES, STAGES, categoryOf } from "@/lib/catalog";
-import { faCompact, faDateTime, faNum, relTime } from "@/lib/format";
+import { faCompact, faNum, relTime } from "@/lib/format";
 import type { BotLog, BotSettings, Stats, Video } from "@/lib/types";
 
 const SOURCE_META: Record<string, { label: string; tone: string }> = {
@@ -228,11 +228,7 @@ export default function DashboardPage() {
             {stats.upcoming.length === 0 && <Empty text="صف خالی است؛ خلبان خودکار به‌زودی پر می‌کند!" />}
             {stats.upcoming.map((u) => (
               <div key={u.id} className="flex items-center gap-3 px-5 py-3">
-                <img
-                  src={u.thumbnail}
-                  alt=""
-                  className="h-12 w-8 rounded-md object-cover ring-1 ring-line"
-                />
+                <Cover catKey={u.category} className="h-12 w-8 rounded-md ring-1 ring-line" emojiClass="text-lg" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-xs font-bold">{u.title}</p>
                   <p className="mt-0.5 text-[10px] text-ink-500">
@@ -252,7 +248,7 @@ export default function DashboardPage() {
             {stats.top.map((tv, i) => (
               <div key={tv.id} className="flex items-center gap-3 px-5 py-3">
                 <span className="font-display text-xl text-coral-300">{faNum(i + 1)}</span>
-                <img src={tv.thumbnail} alt="" className="h-12 w-8 rounded-md object-cover ring-1 ring-line" />
+                <Cover catKey={tv.category} className="h-12 w-8 rounded-md ring-1 ring-line" emojiClass="text-lg" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-xs font-bold">{tv.title}</p>
                   <p className="mt-0.5 flex items-center gap-2 text-[10px] text-ink-500">
