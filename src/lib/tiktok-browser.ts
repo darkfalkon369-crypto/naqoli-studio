@@ -72,11 +72,40 @@ export async function loginWithPassword(
     });
     await page.waitForTimeout(3000);
 
-    let formVisible = await page
-      .locator('input[type="password"], [data-e2e="login-password"]')
-      .first()
-      .isVisible({ timeout: 4000 })
-      .catch(() => false);
+    const hasPassword = async () =>
+      page
+        .locator('input[type="password"], [data-e2e="login-password"]')
+        .first()
+        .isVisible({ timeout: 2500 })
+        .catch(() => false);
+
+    let formVisible = await hasPassword();
+
+    if (!formVisible) {
+      // the login page defaults to the QR tab — switch to credentials method
+      const tryClickText = async (texts: string[]): Promise<boolean> => {
+        for (const t of texts) {
+          try {
+            const loc = page.getByText(t, { exact: false }).first();
+            if (await loc.isVisible({ timeout: 1500 })) {
+              await loc.click({ timeout: 3000 });
+              return true;
+            }
+          } catch {
+            /* try next */
+          }
+        }
+        return false;
+      };
+      await tryClickText(["Use phone / email / username", "phone / email / username"]);
+      await page.waitForTimeout(1500);
+      formVisible = await hasPassword();
+      if (!formVisible) {
+        await tryClickText(["Log in with username"]);
+        await page.waitForTimeout(1500);
+        formVisible = await hasPassword();
+      }
+    }
 
     if (!formVisible) {
       // verification wall or SPA not ready — try the home page modal
